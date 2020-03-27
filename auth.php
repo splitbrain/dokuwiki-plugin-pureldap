@@ -1,25 +1,25 @@
 <?php
+
+use dokuwiki\plugin\pureldap\classes\ADClient;
+use dokuwiki\plugin\pureldap\classes\Client;
+
 /**
  * DokuWiki Plugin pureldap (Auth Component)
  *
  * @license GPL 2 http://www.gnu.org/licenses/gpl-2.0.html
  * @author  Andreas Gohr <andi@splitbrain.org>
  */
-
-// must be run within Dokuwiki
-if (!defined('DOKU_INC')) {
-    die();
-}
-
 class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
 {
-
+    /** @var Client */
+    protected $client;
 
     /**
      * Constructor.
      */
     public function __construct()
     {
+        global $conf;
         parent::__construct(); // for compatibility
 
         // FIXME set capabilities accordingly
@@ -36,7 +36,12 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
         //$this->cando['external']    = false; // does the module do external auth checking?
         //$this->cando['logout']      = true; // can the user logout again? (eg. not possible with HTTP auth)
 
-        // FIXME intialize your auth system and set success to true, if successful
+        // prepare the base client
+        $this->loadConfig();
+        $this->conf['admin_password'] = conf_decodeString($this->conf['admin_password']);
+        $this->conf['defaultgroup'] = $conf['defaultgroup'];
+
+        $this->client = new ADClient($this->conf); // FIXME decide class on config
         $this->success = true;
     }
 
@@ -51,70 +56,48 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
     /**
      * Do all authentication [ OPTIONAL ]
      *
-     * @param   string $user   Username
-     * @param   string $pass   Cleartext Password
-     * @param   bool   $sticky Cookie should not expire
+     * @param string $user Username
+     * @param string $pass Cleartext Password
+     * @param bool $sticky Cookie should not expire
      *
      * @return  bool             true on successful auth
      */
     //public function trustExternal($user, $pass, $sticky = false)
     //{
-        /* some example:
+    /* some example:
 
-        global $USERINFO;
-        global $conf;
-        $sticky ? $sticky = true : $sticky = false; //sanity check
+    global $USERINFO;
+    global $conf;
+    $sticky ? $sticky = true : $sticky = false; //sanity check
 
-        // do the checking here
+    // do the checking here
 
-        // set the globals if authed
-        $USERINFO['name'] = 'FIXME';
-        $USERINFO['mail'] = 'FIXME';
-        $USERINFO['grps'] = array('FIXME');
-        $_SERVER['REMOTE_USER'] = $user;
-        $_SESSION[DOKU_COOKIE]['auth']['user'] = $user;
-        $_SESSION[DOKU_COOKIE]['auth']['pass'] = $pass;
-        $_SESSION[DOKU_COOKIE]['auth']['info'] = $USERINFO;
-        return true;
+    // set the globals if authed
+    $USERINFO['name'] = 'FIXME';
+    $USERINFO['mail'] = 'FIXME';
+    $USERINFO['grps'] = array('FIXME');
+    $_SERVER['REMOTE_USER'] = $user;
+    $_SESSION[DOKU_COOKIE]['auth']['user'] = $user;
+    $_SESSION[DOKU_COOKIE]['auth']['pass'] = $pass;
+    $_SESSION[DOKU_COOKIE]['auth']['info'] = $USERINFO;
+    return true;
 
-        */
+    */
     //}
 
-    /**
-     * Check user+password
-     *
-     * May be ommited if trustExternal is used.
-     *
-     * @param   string $user the user name
-     * @param   string $pass the clear text password
-     *
-     * @return  bool
-     */
+    /** @inheritDoc */
     public function checkPass($user, $pass)
     {
-        // FIXME implement password check
-        return false; // return true if okay
+        // use a separate client from the default one, because this is not a superuser bind
+        $client = new ADClient($this->conf); // FIXME decide class on config
+        return $client->authenticate($user, $pass);
     }
 
-    /**
-     * Return user info
-     *
-     * Returns info about the given user needs to contain
-     * at least these fields:
-     *
-     * name string  full name of the user
-     * mail string  email addres of the user
-     * grps array   list of groups the user is in
-     *
-     * @param   string $user          the user name
-     * @param   bool   $requireGroups whether or not the returned data must include groups
-     *
-     * @return  array  containing user data or false
-     */
-    public function getUserData($user, $requireGroups=true)
+    /** @inheritDoc */
+    public function getUserData($user, $requireGroups = true)
     {
-        // FIXME implement
-        return false;
+        $info = $this->client->getUser($user);
+        return $info ?: false;
     }
 
     /**
@@ -128,17 +111,17 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
      *
      * Set addUser capability when implemented
      *
-     * @param  string     $user
-     * @param  string     $pass
-     * @param  string     $name
-     * @param  string     $mail
-     * @param  null|array $grps
+     * @param string $user
+     * @param string $pass
+     * @param string $name
+     * @param string $mail
+     * @param null|array $grps
      *
      * @return bool|null
      */
     //public function createUser($user, $pass, $name, $mail, $grps = null)
     //{
-        // FIXME implement
+    // FIXME implement
     //    return null;
     //}
 
@@ -147,14 +130,14 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
      *
      * Set the mod* capabilities according to the implemented features
      *
-     * @param   string $user    nick of the user to be changed
-     * @param   array  $changes array of field/value pairs to be changed (password will be clear text)
+     * @param string $user nick of the user to be changed
+     * @param array $changes array of field/value pairs to be changed (password will be clear text)
      *
      * @return  bool
      */
     //public function modifyUser($user, $changes)
     //{
-        // FIXME implement
+    // FIXME implement
     //    return false;
     //}
 
@@ -163,13 +146,13 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
      *
      * Set delUser capability when implemented
      *
-     * @param   array  $users
+     * @param array $users
      *
      * @return  int    number of users deleted
      */
     //public function deleteUsers($users)
     //{
-        // FIXME implement
+    // FIXME implement
     //    return false;
     //}
 
@@ -178,15 +161,15 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
      *
      * Set getUsers capability when implemented
      *
-     * @param   int   $start  index of first user to be returned
-     * @param   int   $limit  max number of users to be returned, 0 for unlimited
-     * @param   array $filter array of field/pattern pairs, null for no filter
+     * @param int $start index of first user to be returned
+     * @param int $limit max number of users to be returned, 0 for unlimited
+     * @param array $filter array of field/pattern pairs, null for no filter
      *
      * @return  array list of userinfo (refer getUserData for internal userinfo details)
      */
     //public function retrieveUsers($start = 0, $limit = 0, $filter = null)
     //{
-        // FIXME implement
+    // FIXME implement
     //    return array();
     //}
 
@@ -196,13 +179,13 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
      *
      * Set getUserCount capability when implemented
      *
-     * @param  array $filter array of field/pattern pairs, empty array for no filter
+     * @param array $filter array of field/pattern pairs, empty array for no filter
      *
      * @return int
      */
     //public function getUserCount($filter = array())
     //{
-        // FIXME implement
+    // FIXME implement
     //    return 0;
     //}
 
@@ -211,13 +194,13 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
      *
      * Set addGroup capability when implemented
      *
-     * @param   string $group
+     * @param string $group
      *
      * @return  bool
      */
     //public function addGroup($group)
     //{
-        // FIXME implement
+    // FIXME implement
     //    return false;
     //}
 
@@ -226,14 +209,14 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
      *
      * Set getGroups capability when implemented
      *
-     * @param   int $start
-     * @param   int $limit
+     * @param int $start
+     * @param int $limit
      *
      * @return  array
      */
     //public function retrieveGroups($start = 0, $limit = 0)
     //{
-        // FIXME implement
+    // FIXME implement
     //    return array();
     //}
 
@@ -278,7 +261,7 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
      *
      * Groupnames are to be passed without a leading '@' here.
      *
-     * @param  string $group groupname
+     * @param string $group groupname
      *
      * @return string the cleaned groupname
      */
@@ -308,13 +291,13 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
      * each page load. Others might want to use their own checking here. If
      * unsure, do not override.
      *
-     * @param  string $user - The username
+     * @param string $user - The username
      *
      * @return bool
      */
-    //public function useSessionCache($user)
-    //{
-      // FIXME implement
-    //}
+    public function useSessionCache($user)
+    {
+        return false;
+    }
 }
 
