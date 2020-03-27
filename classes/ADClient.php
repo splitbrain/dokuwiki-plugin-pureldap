@@ -5,6 +5,7 @@ namespace dokuwiki\plugin\pureldap\classes;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
 
@@ -38,6 +39,33 @@ class ADClient extends Client
             'dn' => $entry->getDn()->toString(),
             'grps' => $this->getUserGroups($entry), // we always return groups because its currently inexpensive
         ];
+    }
+
+    /** @inheritDoc */
+    public function getGroups()
+    {
+        if (!$this->autoAuth()) return [];
+
+        $filter = Filters::equal('objectClass', 'group');
+        $search = Operations::search($filter, 'cn');
+        $paging = $this->ldap->paging($search);
+
+        $groups = [];
+
+        while ($paging->hasEntries()) {
+            try {
+                $entries = $paging->getEntries();
+            } catch (ProtocolException $e) {
+                $this->debug($e);
+                return $groups; // we return what we got so far
+            }
+
+            foreach ($entries as $entry) {
+                $groups[] = $this->attr2str($entry->get('cn'));
+            }
+        }
+
+        return $groups;
     }
 
     /**

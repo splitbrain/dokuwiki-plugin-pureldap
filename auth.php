@@ -96,7 +96,7 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
     /** @inheritDoc */
     public function getUserData($user, $requireGroups = true)
     {
-        $info = $this->client->getUser($user);
+        $info = $this->client->getCachedUser($user, $requireGroups);
         return $info ?: false;
     }
 

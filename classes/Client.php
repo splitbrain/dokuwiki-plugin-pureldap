@@ -24,6 +24,9 @@ abstract class Client
     /** @var array cached user info */
     protected $userCache = [];
 
+    /** @var array cached group list */
+    protected $groupCache = [];
+
     /**
      * Client constructor.
      * @param array $config
@@ -49,6 +52,7 @@ abstract class Client
             'port' => '',
             'admin_username' => '',
             'admin_password' => '',
+            'page_size' => 1000,
         ];
 
         $config = array_merge($defaults, $config);
@@ -76,6 +80,7 @@ abstract class Client
      * @param string $user
      * @param string $pass
      * @return bool was the authentication successful?
+     * @noinspection PhpRedundantCatchClauseInspection
      */
     public function authenticate($user, $pass)
     {
@@ -139,6 +144,27 @@ abstract class Client
     abstract public function getUser($username, $fetchgroups = true);
 
     /**
+     * Return a list of all available groups, use cache if available
+     *
+     * @return string[]
+     */
+    public function getCachedGroups()
+    {
+        if (empty($this->groupCache)) {
+            $this->groupCache = $this->getGroups();
+        }
+
+        return $this->groupCache;
+    }
+
+    /**
+     * Return a list of all available groups
+     *
+     * @return string[]
+     */
+    abstract public function getGroups();
+
+    /**
      * Helper method to get the first value of the given attribute
      *
      * The given attribute may be null, an empty string is returned then
@@ -146,13 +172,13 @@ abstract class Client
      * @param Attribute|null $attribute
      * @return string
      */
-    protected function attr2str($attribute) {
-        if($attribute !== null) {
+    protected function attr2str($attribute)
+    {
+        if ($attribute !== null) {
             return $attribute->firstValue();
         }
         return '';
     }
-
 
     /**
      * Handle debugging
