@@ -158,12 +158,11 @@ abstract class Client
      * Handle debugging
      *
      * @param \Exception $e
-     * @todo more output, better handling if it should be shown or what
      */
     protected function debug(\Exception $e)
     {
-        if(defined('DOKU_UNITTEST')) {
-            throw $e;
+        if (defined('DOKU_UNITTEST')) {
+            throw new \RuntimeException('', 0, $e);
         }
 
         msg($e->getMessage(), -1);
