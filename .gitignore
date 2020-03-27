@@ -1,0 +1,7 @@
+vendor/freedsx/asn1/tests
+vendor/freedsx/ldap/docs
+vendor/freedsx/ldap/tests
+vendor/freedsx/sasl/tests
+vendor/freedsx/socket/tests
+vendor/**/*.yml
+vendor/**/*.dist

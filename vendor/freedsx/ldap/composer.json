@@ -1,0 +1,56 @@
+{
+  "name": "freedsx/ldap",
+  "description": "A Pure PHP LDAP library",
+  "homepage": "https://github.com/FreeDSx/LDAP",
+  "keywords": [
+    "LDAP"
+  ],
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Chad Sikorra",
+      "email": "Chad.Sikorra@gmail.com"
+    }
+  ],
+  "require": {
+    "php": ">=7.1",
+    "freedsx/asn1": "^0.4.0",
+    "freedsx/socket": "^0.4.0",
+    "freedsx/sasl": "^0.1.0"
+  },
+  "require-dev": {
+    "phpspec/phpspec": "^5.1|^6.1",
+    "phpunit/phpunit": "^8.0|^7.0",
+    "phpstan/phpstan": "^0.11.15",
+    "phpstan/phpstan-strict-rules": "^0.11.1",
+    "symplify/easy-coding-standard": "^6.1",
+    "friends-of-phpspec/phpspec-code-coverage": "^4.3"
+  },
+  "suggest": {
+    "ext-openssl": "For SSL/TLS support and some SASL mechanisms."
+  },
+  "autoload": {
+    "psr-4": {"FreeDSx\\Ldap\\": "src/FreeDSx/Ldap"}
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "unit\\FreeDSx\\Ldap\\": "tests/unit/FreeDSx/Ldap",
+      "spec\\FreeDSx\\Ldap\\": "tests/spec/FreeDSx/Ldap"
+    }
+  },
+  "scripts": {
+    "test-coverage": [
+      "phpspec run --no-interaction -c phpspec.cov.yml",
+      "phpunit --coverage-clover=coverage-integration.xml"
+    ],
+    "test-spec": [
+      "phpspec run --no-interaction"
+    ],
+    "test-integration": [
+      "phpunit"
+    ],
+    "analyse": [
+      "phpstan analyse"
+    ]
+  }
+}

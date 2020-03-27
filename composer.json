@@ -1,0 +1,14 @@
+{
+    "name": "splitbrain/dokuwiki-plugin-pureldap",
+    "type": "project",
+    "license": "GPLv2",
+    "authors": [
+        {
+            "name": "Andreas Gohr",
+            "email": "andi@splitbrain.org"
+        }
+    ],
+    "require": {
+        "freedsx/ldap": "^0.6.0"
+    }
+}
