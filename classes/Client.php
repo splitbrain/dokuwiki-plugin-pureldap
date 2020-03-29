@@ -88,7 +88,7 @@ abstract class Client
             try {
                 $this->ldap->startTls();
             } catch (OperationException $e) {
-                $this->debug($e);
+                $this->fatal($e);
             }
         }
 
@@ -97,10 +97,10 @@ abstract class Client
         } catch (BindException $e) {
             return false;
         } catch (ConnectionException $e) {
-            $this->debug($e);
+            $this->fatal($e);
             return false;
         } catch (OperationException $e) {
-            $this->debug($e);
+            $this->fatal($e);
             return false;
         }
 
@@ -181,16 +181,27 @@ abstract class Client
     }
 
     /**
-     * Handle debugging
+     * Handle fatal exceptions
      *
      * @param \Exception $e
      */
-    protected function debug(\Exception $e)
+    protected function fatal(\Exception $e)
     {
         if (defined('DOKU_UNITTEST')) {
             throw new \RuntimeException('', 0, $e);
         }
+        msg('[pureldap] ' . hsc($e->getMessage()) . ' at ' . $e->getFile() . ':' . $e->getLine(), -1);
+    }
 
-        msg($e->getMessage(), -1);
+    /**
+     * Handle debug output
+     *
+     * @param string $msg
+     * @param string $file
+     * @param int $line
+     */
+    protected function debug($msg, $file, $line)
+    {
+        msg('[pureldap] ' . hsc($msg) . ' at ' . $file . ':' . $line, 1);
     }
 }
