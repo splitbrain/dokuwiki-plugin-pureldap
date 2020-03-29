@@ -167,11 +167,11 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
      *
      * @return  array list of userinfo (refer getUserData for internal userinfo details)
      */
-    //public function retrieveUsers($start = 0, $limit = 0, $filter = null)
-    //{
-    // FIXME implement
-    //    return array();
-    //}
+    public function retrieveUsers($start = 0, $limit = 0, $filter = null)
+    {
+        // FIXME implement
+        return array();
+    }
 
     /**
      * Return a count of the number of user which meet $filter criteria
@@ -204,21 +204,11 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
     //    return false;
     //}
 
-    /**
-     * Retrieve groups [implement only where required/possible]
-     *
-     * Set getGroups capability when implemented
-     *
-     * @param int $start
-     * @param int $limit
-     *
-     * @return  array
-     */
-    //public function retrieveGroups($start = 0, $limit = 0)
-    //{
-    // FIXME implement
-    //    return array();
-    //}
+    /** @inheritDoc */
+    public function retrieveGroups($start = 0, $limit = 0)
+    {
+        return array_slice($this->client->getCachedGroups(), $start, $limit);
+    }
 
     /**
      * Return case sensitivity of the backend
@@ -298,6 +288,28 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
     public function useSessionCache($user)
     {
         return false;
+    }
+
+    /**
+     * Convert DokuWiki filter type to method in the library
+     *
+     * @todo implement with proper constants once #3028 has been implemented
+     * @param string $type
+     * @return string
+     */
+    protected function filterType2FilterMethod($type) {
+        $filtermethods = [
+            'contains' => 'contains',
+            'startswith' => 'startsWith',
+            'endswith' => 'endsWith',
+            'equals' => 'equals'
+        ];
+
+        if(isset($filtermethods[$type])) {
+            return $filtermethods[$type];
+        }
+
+        return 'equals';
     }
 }
 

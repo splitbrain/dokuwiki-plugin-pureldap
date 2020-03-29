@@ -12,4 +12,5 @@ $meta['use_tls'] = array('onoff');
 $meta['use_ssl'] = array('onoff');
 $meta['admin_user'] = array('string');
 $meta['admin_password'] = array('pass');
+$meta['base_dn'] = array('string');
 

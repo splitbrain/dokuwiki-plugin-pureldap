@@ -11,3 +11,4 @@ $conf['use_tls'] = '';
 $conf['use_ssl'] = '';
 $conf['admin_user'] = '';
 $conf['admin_password'] = '';
+$conf['base_dn'] = '';

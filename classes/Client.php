@@ -160,9 +160,13 @@ abstract class Client
     /**
      * Return a list of all available groups
      *
+     * Optionally filter the list
+     *
+     * @param null|string $match Filter for this, null for all groups
+     * @param string $filtermethod How to match the groups
      * @return string[]
      */
-    abstract public function getGroups();
+    abstract public function getGroups($match = null, $filtermethod = 'equal');
 
     /**
      * Helper method to get the first value of the given attribute
