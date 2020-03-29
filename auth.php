@@ -22,19 +22,8 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
         global $conf;
         parent::__construct(); // for compatibility
 
-        // FIXME set capabilities accordingly
-        //$this->cando['addUser']     = false; // can Users be created?
-        //$this->cando['delUser']     = false; // can Users be deleted?
-        //$this->cando['modLogin']    = false; // can login names be changed?
-        //$this->cando['modPass']     = false; // can passwords be changed?
-        //$this->cando['modName']     = false; // can real names be changed?
-        //$this->cando['modMail']     = false; // can emails be changed?
-        //$this->cando['modGroups']   = false; // can groups be changed?
-        //$this->cando['getUsers']    = false; // can a (filtered) list of users be retrieved?
-        //$this->cando['getUserCount']= false; // can the number of users be retrieved?
-        //$this->cando['getGroups']   = false; // can a list of available groups be retrieved?
-        //$this->cando['external']    = false; // does the module do external auth checking?
-        //$this->cando['logout']      = true; // can the user logout again? (eg. not possible with HTTP auth)
+        $this->cando['getUsers'] = true;
+        $this->cando['getGroups'] = true;
 
         // prepare the base client
         $this->loadConfig();
@@ -156,38 +145,17 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
     //    return false;
     //}
 
-    /**
-     * Bulk retrieval of user data [implement only where required/possible]
-     *
-     * Set getUsers capability when implemented
-     *
-     * @param int $start index of first user to be returned
-     * @param int $limit max number of users to be returned, 0 for unlimited
-     * @param array $filter array of field/pattern pairs, null for no filter
-     *
-     * @return  array list of userinfo (refer getUserData for internal userinfo details)
-     */
+    /** @inheritDoc */
     public function retrieveUsers($start = 0, $limit = 0, $filter = null)
     {
-        // FIXME implement
-        return array();
+        return array_slice(
+            $this->client->getFilteredUsers(
+                $filter,
+                $this->filterType2FilterMethod('contains')
+            ),
+            $start,
+            $limit);
     }
-
-    /**
-     * Return a count of the number of user which meet $filter criteria
-     * [should be implemented whenever retrieveUsers is implemented]
-     *
-     * Set getUserCount capability when implemented
-     *
-     * @param array $filter array of field/pattern pairs, empty array for no filter
-     *
-     * @return int
-     */
-    //public function getUserCount($filter = array())
-    //{
-    // FIXME implement
-    //    return 0;
-    //}
 
     /**
      * Define a group [implement only where required/possible]
@@ -297,15 +265,16 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
      * @param string $type
      * @return string
      */
-    protected function filterType2FilterMethod($type) {
+    protected function filterType2FilterMethod($type)
+    {
         $filtermethods = [
             'contains' => 'contains',
             'startswith' => 'startsWith',
             'endswith' => 'endsWith',
-            'equals' => 'equals'
+            'equals' => 'equals',
         ];
 
-        if(isset($filtermethods[$type])) {
+        if (isset($filtermethods[$type])) {
             return $filtermethods[$type];
         }
 

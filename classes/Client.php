@@ -206,6 +206,6 @@ abstract class Client
      */
     protected function debug($msg, $file, $line)
     {
-        msg('[pureldap] ' . hsc($msg) . ' at ' . $file . ':' . $line, 1);
+        msg('[pureldap] ' . hsc($msg) . ' at ' . $file . ':' . $line, 0);
     }
 }
