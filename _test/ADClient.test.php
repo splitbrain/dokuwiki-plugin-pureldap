@@ -8,7 +8,7 @@ use dokuwiki\plugin\pureldap\classes\ADClient;
  * @group plugin_pureldap
  * @group plugins
  */
-class adcliebt_plugin_pureldap_test extends DokuWikiTest
+class adclient_plugin_pureldap_test extends DokuWikiTest
 {
     /**
      * Create a client with default settings
@@ -26,10 +26,13 @@ class adcliebt_plugin_pureldap_test extends DokuWikiTest
             array_merge(
                 [
                     'base_dn' => 'DC=example,DC=local',
-                    'servers' => ['127.0.0.1'],
-                    'port' => 7389,
+                    'servers' => ['localhost'],
+                    'port' => 7636,
                     'admin_username' => 'vagrant@example.local',
                     'admin_password' => 'vagrant',
+                    'use_ssl' => true,
+                    'ssl_validate_cert' => false,
+                    #'ssl_allow_self_signed' => true,
                 ],
                 $conf
             )
@@ -41,21 +44,32 @@ class adcliebt_plugin_pureldap_test extends DokuWikiTest
      */
     public function test_getUser()
     {
-        $client = $this->getClient();
-        $user = $client->getUser('a.legrand@example.local');
-
-        $this->assertSame([
+        $expect = [
             'user' => 'a.legrand@example.local',
             'name' => 'Amerigo Legrand',
             'mail' => 'a.legrand@example.com',
             'dn' => 'CN=Amerigo Legrand,CN=Users,DC=example,DC=local',
             'grps' => [
-                'user',
-                'gamma nested',
                 'beta',
-                'Domain Users',
+                'domain users',
+                'gamma nested',
+                'user',
             ],
-        ], $user);
+        ];
+
+        $client = $this->getClient();
+        $user = $client->getUser('a.legrand@example.local');
+        $this->assertSame($expect, $user);
+
+        // with domain set, we expect shorter user names
+        $expect['user'] = 'a.legrand';
+        $client = $this->getClient(['domain' => 'example.local']);
+        $user = $client->getUser('a.legrand@example.local');
+        $this->assertSame($expect, $user);
+
+        // access should work without the domain, too
+        $user = $client->getUser('a.legrand');
+        $this->assertSame($expect, $user);
     }
 
     /**
@@ -94,7 +108,11 @@ class adcliebt_plugin_pureldap_test extends DokuWikiTest
         $this->assertGreaterThan(20, count($users));
         $this->assertLessThan(150, count($users));
 
+        $this->assertArrayHasKey('a.blaskett@example.local', $users, 'This user should be in alpha');
+        $this->assertArrayNotHasKey('a.legrand@example.local', $users, 'This user is not in alpha');
+
         $users = $client->getFilteredUsers(['grps' => 'alpha', 'name' => 'Andras'], 'startswith');
         $this->assertCount(1, $users);
     }
+
 }
