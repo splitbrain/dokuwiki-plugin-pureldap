@@ -2,6 +2,7 @@
 
 namespace dokuwiki\plugin\pureldap\classes;
 
+use dokuwiki\Utf8\PhpString;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
@@ -47,6 +48,7 @@ abstract class Client
     {
         $defaults = [
             'defaultgroup' => 'user', // we expect this to be passed from global conf
+            'domain' => '',
             'use_tls' => false,
             'use_ssl' => false,
             'port' => '',
@@ -61,6 +63,8 @@ abstract class Client
         if (!$config['port']) {
             $config['port'] = $config['use_ssl'] ? 636 : 389;
         }
+
+        $config['domain'] = PhpString::strtolower($config['domain']);
 
         return $config;
     }
@@ -84,6 +88,8 @@ abstract class Client
      */
     public function authenticate($user, $pass)
     {
+        $user = $this->qualifiedUser($user);
+
         if ($this->config['use_tls']) {
             try {
                 $this->ldap->startTls();
@@ -167,6 +173,23 @@ abstract class Client
      * @return string[]
      */
     abstract public function getGroups($match = null, $filtermethod = 'equal');
+
+
+    /**
+     * Construst the fully qualified name to identify a user
+     *
+     * @param string $username
+     * @return string
+     */
+    abstract public function qualifiedUser($username);
+
+    /**
+     * Simplify the username if possible
+     *
+     * @param string $username
+     * @return string
+     */
+    abstract public function simpleUser($username);
 
     /**
      * Helper method to get the first value of the given attribute

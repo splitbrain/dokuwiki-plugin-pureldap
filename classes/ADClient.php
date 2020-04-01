@@ -2,6 +2,7 @@
 
 namespace dokuwiki\plugin\pureldap\classes;
 
+use dokuwiki\Utf8\PhpString;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -19,7 +20,7 @@ class ADClient extends Client
 
         $filter = Filters::and(
             Filters::equal('objectClass', 'user'),
-            Filters::equal('userPrincipalName', $username)
+            Filters::equal('userPrincipalName', $this->qualifiedUser($username))
         );
         $this->debug('Searching ' . $filter->toString(), __FILE__, __LINE__);
 
@@ -109,15 +110,49 @@ class ADClient extends Client
                 $entries = $paging->getEntries();
             } catch (ProtocolException $e) {
                 $this->fatal($e);
-                return $users; // we return what we got so far
+                break; // we abort and return what we have so far
             }
 
             foreach ($entries as $entry) {
-                $users[] = $this->entry2User($entry);
+                $userinfo = $this->entry2User($entry);
+                $users[$userinfo['user']] = $this->entry2User($entry);
             }
         }
 
         return $users;
+    }
+
+    /**
+     * @inheritDoc
+     * userPrincipalName in the form <user>@<domain>
+     */
+    public function qualifiedUser($user)
+    {
+        $user = PhpString::strtolower($user);
+        if (!$this->config['domain']) return $user;
+
+        list($user, $domain) = explode('@', $user, 2);
+        if (!$domain) {
+            $domain = $this->config['domain'];
+        }
+
+        return $user . '@' . $domain;
+    }
+
+    /**
+     * @inheritDoc
+     * Removes the account suffix from the given user
+     */
+    public function simpleUser($user)
+    {
+        $user = PhpString::strtolower($user);
+        if (!$this->config['domain']) return $user;
+
+        // strip account suffix
+        list($luser, $suffix) = explode('@', $user, 2);
+        if ($suffix === $this->config['domain']) return $luser;
+
+        return $user;
     }
 
     /**
@@ -129,7 +164,7 @@ class ADClient extends Client
     protected function entry2User(Entry $entry)
     {
         return [
-            'user' => $this->attr2str($entry->get('UserPrincipalName')),
+            'user' => $this->simpleUser($this->attr2str($entry->get('UserPrincipalName'))),
             'name' => $this->attr2str($entry->get('DisplayName')) ?: $this->attr2str($entry->get('Name')),
             'mail' => $this->attr2str($entry->get('mail')),
             'dn' => $entry->getDn()->toString(),
@@ -155,7 +190,7 @@ class ADClient extends Client
         if ($userentry->has('memberOf')) {
             foreach ($userentry->get('memberOf')->getValues() as $dn) {
                 list($cn) = explode(',', $dn, 2);
-                $groups[] = substr($cn, 3);
+                $groups[] = PhpString::strtolower(substr($cn, 3));
             }
         }
 
@@ -163,7 +198,7 @@ class ADClient extends Client
         // http://support.microsoft.com/?kbid=321360
         $gid = $userentry->get('primaryGroupID')->firstValue();
         if ($gid == 513) {
-            $groups[] = 'Domain Users';
+            $groups[] = 'domain users';
         }
 
         return $groups;
