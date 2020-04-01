@@ -67,6 +67,7 @@ class ADClient extends Client
             }
         }
 
+        asort($groups);
         return $groups;
     }
 
@@ -119,6 +120,7 @@ class ADClient extends Client
             }
         }
 
+        ksort($users);
         return $users;
     }
 
@@ -201,6 +203,7 @@ class ADClient extends Client
             $groups[] = 'domain users';
         }
 
+        sort($groups);
         return $groups;
     }
 }
