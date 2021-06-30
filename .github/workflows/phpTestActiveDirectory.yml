@@ -1,23 +1,35 @@
-name: PHP Tests on Linux
+name: Tests for AD
 
 on: [push, pull_request]
 
 jobs:
-    testLinux:
+    testAD:
         name: PHP ${{ matrix.php-versions }} DokuWiki ${{ matrix.dokuwiki-branch }}
-        runs-on: ubuntu-latest
+        runs-on: windows-latest
         if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
 
         strategy:
             matrix:
-                php-versions: ['7.2', '7.3', '7.4', '8.0']
-                dokuwiki-branch: [ 'master', 'stable']
-                exclude:
-                    -   dokuwiki-branch: 'stable'
-                        php-versions: '8.0'
+                php-versions: ['7.4']
+                dokuwiki-branch: [ 'master']
             fail-fast: false
 
         steps:
+            - name: Install AD
+              run: |
+                  C:\msys64\usr\bin\wget.exe https://github.com/splitbrain/vagrant-active-directory/archive/refs/heads/master.zip
+                  unzip master.zip
+                  Remove-Item master.zip
+                  cd vagrant-active-directory-master
+                  .\scripts\install_ad.ps1
+                  .\scripts\configure_ad.ps1 'example.local' 'EXAMPLE' 'Admin123#'
+                  .\scripts\certificate.ps1 'dc' 'example.local' 'C:'
+                  Start-Service NTDS -Verbose
+                  Restart-Service -Name CertPropSvc,CryptSvc,DNS,ADWS,NTDS -Verbose
+                  Get-ADDomain
+                  cd ..
+                  Remove-Item vagrant-active-directory-master -Recurse
+
             - name: Checkout
               uses: actions/checkout@v2
 
