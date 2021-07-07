@@ -32,6 +32,7 @@ class adclient_plugin_pureldap_test extends DokuWikiTest
                     'admin_password' => 'vagrant',
                     'encryption' => 'ssl',
                     'validate' => 'self',
+                    'attributes' => ['mobile'],
                 ],
                 $conf
             )
@@ -54,6 +55,7 @@ class adclient_plugin_pureldap_test extends DokuWikiTest
                 'gamma nested',
                 'user',
             ],
+            'mobile' => '+63 (483) 526-8809',
         ];
 
         $client = $this->getClient();

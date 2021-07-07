@@ -53,9 +53,10 @@ abstract class Client
             'encryption' => false,
             'admin_username' => '',
             'admin_password' => '',
-            'page_size' => 1000,
+            'page_size' => 150,
             'use_ssl' => false,
             'validate' => 'strict',
+            'attributes' => [],
         ];
 
         $config = array_merge($defaults, $config);

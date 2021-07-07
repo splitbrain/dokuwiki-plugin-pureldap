@@ -16,6 +16,7 @@ $meta['validate'] = array('multichoice', '_choices' => array('strict', 'self', '
 $meta['admin_username'] = array('string');
 $meta['admin_password'] = array('password');
 
+$meta['attributes'] = array('array');
 $meta['page_size'] = array('numeric', '_min' => 1);
 
 

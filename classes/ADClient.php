@@ -107,7 +107,7 @@ class ADClient extends Client
             $filter->add($or);
         }
         $this->debug('Searching ' . $filter->toString(), __FILE__, __LINE__);
-        $search = Operations::search($filter);
+        $search = Operations::search($filter); // FIXME we currently fetch all attributes
         $paging = $this->ldap->paging($search);
 
         $users = [];
@@ -170,13 +170,20 @@ class ADClient extends Client
      */
     protected function entry2User(Entry $entry)
     {
-        return [
+        $user = [
             'user' => $this->simpleUser($this->attr2str($entry->get('UserPrincipalName'))),
             'name' => $this->attr2str($entry->get('DisplayName')) ?: $this->attr2str($entry->get('Name')),
             'mail' => $this->attr2str($entry->get('mail')),
             'dn' => $entry->getDn()->toString(),
             'grps' => $this->getUserGroups($entry), // we always return groups because its currently inexpensive
         ];
+
+        // get additional attributes
+        foreach ($this->config['attributes'] as $attr) {
+            $user[$attr] = $this->attr2str($entry->get($attr));
+        }
+
+        return $user;
     }
 
     /**

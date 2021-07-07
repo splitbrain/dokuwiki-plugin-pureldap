@@ -7,7 +7,7 @@
 
 $conf['base_dn'] = '';
 
-$conf['servers'] = [];
+$conf['servers'] = array();
 $conf['port'] = '';
 
 $conf['encryption'] = 'none';
@@ -16,4 +16,5 @@ $conf['validate'] = 'strict';
 $conf['admin_username'] = '';
 $conf['admin_password'] = '';
 
+$conf['attributes'] = array();
 $conf['page_size'] = 150;
