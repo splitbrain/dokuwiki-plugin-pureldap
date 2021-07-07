@@ -237,6 +237,28 @@ abstract class Client
     }
 
     /**
+     * Get the attributes that should be fetched for a user
+     *
+     * Can be extended in sub classes
+     *
+     * @return Attribute[]
+     */
+    protected function userAttributes()
+    {
+        // defaults
+        $attr = [
+            new Attribute('dn'),
+            new Attribute('displayName'),
+            new Attribute('mail'),
+        ];
+        // additionals
+        foreach ($this->config['attributes'] as $attribute) {
+            $attr[] = new Attribute($attribute);
+        }
+        return $attr;
+    }
+
+    /**
      * Handle fatal exceptions
      *
      * @param \Exception $e

@@ -3,6 +3,7 @@
 namespace dokuwiki\plugin\pureldap\classes;
 
 use dokuwiki\Utf8\PhpString;
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -26,7 +27,8 @@ class ADClient extends Client
 
         try {
             /** @var Entries $entries */
-            $entries = $this->ldap->search(Operations::search($filter));
+            $attributes = $this->userAttributes();
+            $entries = $this->ldap->search(Operations::search($filter, ...$attributes));
         } catch (OperationException $e) {
             $this->fatal($e);
             return null;
@@ -107,7 +109,8 @@ class ADClient extends Client
             $filter->add($or);
         }
         $this->debug('Searching ' . $filter->toString(), __FILE__, __LINE__);
-        $search = Operations::search($filter); // FIXME we currently fetch all attributes
+        $attributes = $this->userAttributes();
+        $search = Operations::search($filter, ...$attributes);
         $paging = $this->ldap->paging($search);
 
         $users = [];
@@ -218,4 +221,17 @@ class ADClient extends Client
         sort($groups);
         return $groups;
     }
+
+    /** @inheritDoc */
+    protected function userAttributes()
+    {
+        $attr = parent::userAttributes();
+        $attr[] = new Attribute('UserPrincipalName');
+        $attr[] = new Attribute('Name');
+        $attr[] = new Attribute('primaryGroupID');
+        $attr[] = new Attribute('memberOf');
+
+        return $attr;
+    }
+
 }
