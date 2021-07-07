@@ -8,23 +8,25 @@
     "packages": [
         {
             "name": "freedsx/asn1",
-            "version": "0.4.1",
+            "version": "0.4.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/FreeDSx/ASN1.git",
-                "reference": "d1f7c9dc0bbe047a95a527cd134e3d7dece97ac3"
+                "reference": "639dc827bfd2750b90972d05dccd1c303f91de39"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/FreeDSx/ASN1/zipball/d1f7c9dc0bbe047a95a527cd134e3d7dece97ac3",
-                "reference": "d1f7c9dc0bbe047a95a527cd134e3d7dece97ac3",
+                "url": "https://api.github.com/repos/FreeDSx/ASN1/zipball/639dc827bfd2750b90972d05dccd1c303f91de39",
+                "reference": "639dc827bfd2750b90972d05dccd1c303f91de39",
                 "shasum": ""
             },
             "require": {
                 "php": ">=7.1"
             },
             "require-dev": {
-                "phpspec/phpspec": "^5.0"
+                "friends-of-phpspec/phpspec-code-coverage": "^4.3",
+                "phpspec/phpspec": "^5.1|^6.1",
+                "phpstan/phpstan": "^0.11.15"
             },
             "suggest": {
                 "ext-gmp": "For big integer support in Integer/Enumerated/OID types and tag numbers."
@@ -54,7 +56,11 @@
                 "ber",
                 "x.690"
             ],
-            "time": "2019-03-10T22:33:37+00:00"
+            "support": {
+                "issues": "https://github.com/FreeDSx/ASN1/issues",
+                "source": "https://github.com/FreeDSx/ASN1/tree/0.4.4"
+            },
+            "time": "2020-10-04T18:16:17+00:00"
         },
         {
             "name": "freedsx/ldap",
@@ -108,6 +114,10 @@
             "keywords": [
                 "ldap"
             ],
+            "support": {
+                "issues": "https://github.com/FreeDSx/LDAP/issues",
+                "source": "https://github.com/FreeDSx/LDAP/tree/0.6.0"
+            },
             "time": "2019-12-14T18:46:53+00:00"
         },
         {
@@ -158,6 +168,10 @@
                 "DIGEST-MD5",
                 "sasl"
             ],
+            "support": {
+                "issues": "https://github.com/FreeDSx/SASL/issues",
+                "source": "https://github.com/FreeDSx/SASL/tree/0.1.1"
+            },
             "time": "2019-12-10T01:45:19+00:00"
         },
         {
@@ -211,6 +225,10 @@
                 "tcp",
                 "udp"
             ],
+            "support": {
+                "issues": "https://github.com/FreeDSx/Socket/issues",
+                "source": "https://github.com/FreeDSx/Socket/tree/0.4.0"
+            },
             "time": "2019-12-14T17:31:33+00:00"
         }
     ],
@@ -222,5 +240,5 @@
     "prefer-lowest": false,
     "platform": [],
     "platform-dev": [],
-    "plugin-api-version": "1.1.0"
+    "plugin-api-version": "2.1.0"
 }

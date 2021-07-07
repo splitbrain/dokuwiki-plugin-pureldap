@@ -49,6 +49,11 @@ class BerEncoder implements EncoderInterface
     protected const BOOL_TRUE = "\xff";
 
     /**
+     * Anything greater than this we assume we may need to deal with a bigint in an OIDs second component.
+     */
+    protected const MAX_SECOND_COMPONENT = PHP_INT_MAX - 80;
+
+    /**
      * @var array
      */
     protected $tagMap = [
@@ -87,7 +92,7 @@ class BerEncoder implements EncoderInterface
     protected $maxLen;
 
     /**
-     * @var string
+     * @var string|null
      */
     protected $binary;
 
@@ -122,11 +127,13 @@ class BerEncoder implements EncoderInterface
      */
     public function complete(IncompleteType $type, int $tagType, array $tagMap = []) : AbstractType
     {
+        $lastPos = $this->lastPos;
         $this->startEncoding($type->getValue(), $tagMap);
         $newType = $this->decodeBytes(false, $tagType, $this->maxLen, $type->getIsConstructed(), AbstractType::TAG_CLASS_UNIVERSAL);
         $this->stopEncoding();
         $newType->setTagNumber($type->getTagNumber())
             ->setTagClass($type->getTagClass());
+        $this->lastPos = $lastPos;
 
         return $newType;
     }
@@ -178,7 +185,10 @@ class BerEncoder implements EncoderInterface
                 $bytes = '';
                 break;
             default:
-                throw new EncoderException(sprintf('The type "%s" is not currently supported.', $type));
+                throw new EncoderException(sprintf(
+                    'The type "%s" is not currently supported.',
+                    get_class($type)
+                ));
         }
         $length = \strlen($bytes);
         $bytes = ($length < 128)  ? \chr($length).$bytes : $this->encodeLongDefiniteLength($length).$bytes;
@@ -471,7 +481,7 @@ class BerEncoder implements EncoderInterface
         if ($lengthOfLength === 127) {
             throw new EncoderException('The decoded length cannot be equal to 127 bytes.');
         }
-        if (($lengthOfLength + 1) > ($this->maxLen - $this->pos)) {
+        if ($lengthOfLength > ($this->maxLen - $this->pos)) {
             throw new PartialPduException('Not enough data to decode the length.');
         }
         $endAt = $this->pos + $lengthOfLength;
@@ -494,14 +504,15 @@ class BerEncoder implements EncoderInterface
     protected function getVlqBytesToInt()
     {
         $value = 0;
+        $lshift = 0;
         $isBigInt = false;
 
         for ($this->pos; $this->pos < $this->maxLen; $this->pos++) {
             if (!$isBigInt) {
                 $lshift = $value << 7;
-                # An overflow bitshift will result in a negative number. This will check if GMP is available and flip it
-                # to a bigint safe method in one shot.
-                if ($lshift < 0) {
+                # An overflow bitshift will result in a negative number or zero.
+                # This will check if GMP is available and flip it to a bigint safe method in one shot.
+                if ($value > 0 && $lshift <= 0) {
                     $isBigInt = true;
                     $this->throwIfBigIntGmpNeeded(true);
                     $value = \gmp_init($value);
@@ -519,6 +530,7 @@ class BerEncoder implements EncoderInterface
             # We have reached the last byte if the MSB is not set.
             if ((\ord($this->binary[$this->pos]) & 0x80) === 0) {
                 $this->pos++;
+
                 return $isBigInt ? \gmp_strval($value) : $value;
             }
         }
@@ -577,7 +589,10 @@ class BerEncoder implements EncoderInterface
             return;
         }
 
-        throw new EncoderException('The value to encode for "%s" must must be numeric.');
+        throw new EncoderException(sprintf(
+            'The value to encode for "%s" must be numeric.',
+            $integer
+        ));
     }
 
     /**
@@ -648,14 +663,30 @@ class BerEncoder implements EncoderInterface
      */
     protected function encodeOid(OidType $type)
     {
+        /** @var int[] $oids */
         $oids = \explode('.', $type->getValue());
         $length = \count($oids);
         if ($length < 2) {
-            throw new EncoderException(sprintf('To encode the OID it must have at least 2 components: %s', $type->getValue()));
+            throw new EncoderException(sprintf(
+                'To encode the OID it must have at least 2 components: %s',
+                $type->getValue()
+            ));
+        }
+        if ($oids[0] > 2) {
+            throw new EncoderException(sprintf(
+                'The value of the first OID component cannot be greater than 2. Received:  %s',
+                $oids[0]
+            ));
         }
 
-        # The first and second components of the OID are represented by one byte using the formula: (X * 40) + Y
-        $bytes = \chr(($oids[0] * 40) + $oids[1]);
+        # The first and second components of the OID are represented using the formula: (X * 40) + Y
+        if ($oids[1] > self::MAX_SECOND_COMPONENT) {
+            $this->throwIfBigIntGmpNeeded(true);
+            $firstAndSecond = \gmp_strval(\gmp_add((string)($oids[0] * 40), $oids[1]));
+        } else {
+            $firstAndSecond = ($oids[0] * 40) + $oids[1];
+        }
+        $bytes = $this->intToVlqBytes($firstAndSecond);
 
         for ($i = 2; $i < $length; $i++) {
             $bytes .= $this->intToVlqBytes($oids[$i]);
@@ -744,7 +775,7 @@ class BerEncoder implements EncoderInterface
     }
 
     /**
-     * @param AbstractType|IntegerType|EnumeratedType $type
+     * @param IntegerType|EnumeratedType $type
      * @return string
      * @throws EncoderException
      */
@@ -900,7 +931,7 @@ class BerEncoder implements EncoderInterface
     }
 
     /**
-     * @param $length
+     * @param int $length
      * @return string
      * @throws EncoderException
      */
@@ -909,22 +940,29 @@ class BerEncoder implements EncoderInterface
         if ($length === 0) {
             throw new EncoderException('Zero length not permitted for an OID type.');
         }
-        # The first 2 digits are contained within the first byte
-        $byte = \ord($this->binary[$this->pos++]);
-        $first = (int) ($byte / 40);
-        $second =  $byte - (40 * $first);
-        $length--;
+        # We need to get the first part here, as it's used to determine the first 2 components.
+        $startedAt = $this->pos;
+        $firstPart = $this->getVlqBytesToInt();
 
-        $oid = $first.'.'.$second;
-        if ($length) {
-            $oid .= '.'.$this->decodeRelativeOid($length);
+        if ($firstPart < 80) {
+            $oid = \floor($firstPart / 40).'.'.($firstPart % 40);
+        } else {
+            $isBigInt = ($firstPart > PHP_INT_MAX);
+            $this->throwIfBigIntGmpNeeded($isBigInt);
+            # In this case, the first identifier is always 2.
+            # But there is no limit on the value of the second identifier.
+            $oid = '2.'.($isBigInt ? \gmp_strval(\gmp_sub($firstPart, '80')) : (int)$firstPart - 80);
         }
 
-        return $oid;
+        # We could potentially have nothing left to decode at this point.
+        $oidLength = $length - ($this->pos - $startedAt);
+        $subIdentifiers = ($oidLength === 0) ? '' : '.'.$this->decodeRelativeOid($oidLength);
+
+        return $oid.$subIdentifiers;
     }
 
     /**
-     * @param $length
+     * @param int $length
      * @return string
      * @throws EncoderException
      */
@@ -1100,7 +1138,7 @@ class BerEncoder implements EncoderInterface
     }
 
     /**
-     * @param AbstractType[] $types
+     * @param AbstractType ...$types
      * @return string
      * @throws EncoderException
      */
