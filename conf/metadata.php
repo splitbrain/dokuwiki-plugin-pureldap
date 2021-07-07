@@ -13,7 +13,7 @@ $meta['port'] = array('string');
 $meta['encryption'] = array('multichoice', '_choices' => array('none', 'ssl', 'tls'));
 $meta['validate'] = array('multichoice', '_choices' => array('strict','self', 'none'));
 
-$meta['admin_user'] = array('string');
+$meta['admin_username'] = array('string');
 $meta['admin_password'] = array('password');
 
 

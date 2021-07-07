@@ -84,7 +84,9 @@ abstract class Client
     public function autoAuth()
     {
         if ($this->isAuthenticated) return true;
-        $ok = $this->authenticate($this->config['admin_username'], $this->config['admin_password']);
+
+        $user = $this->qualifiedUser($this->config['admin_username']);
+        $ok = $this->authenticate($user, $this->config['admin_password']);
         if(!$ok) {
             $this->debug('Administrative bind failed. Probably wrong user/password.', __FILE__, __LINE__);
         }

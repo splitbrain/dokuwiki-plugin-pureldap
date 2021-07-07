@@ -20,7 +20,7 @@ $lang['validate_o_strict'] = 'Strict validation';
 $lang['validate_o_self'] = 'Allow self-signed certificates';
 $lang['validate_o_none'] = 'Accept all certificates (no validation)';
 
-$lang['admin_user'] = 'A privileged user with access to all other user\'s data. Needed for certain actions like sending subscription mails.';
+$lang['admin_username'] = 'A privileged user with access to all other user\'s data. Needed for certain actions like sending subscription mails.';
 $lang['admin_password'] = 'The password of the above user.';
 
 

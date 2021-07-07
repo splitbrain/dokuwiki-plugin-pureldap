@@ -13,5 +13,5 @@ $conf['port'] = '';
 $conf['encryption'] = 'none';
 $conf['validate'] = 'strict';
 
-$conf['admin_user'] = '';
+$conf['admin_username'] = '';
 $conf['admin_password'] = '';
