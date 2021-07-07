@@ -15,3 +15,5 @@ $conf['validate'] = 'strict';
 
 $conf['admin_username'] = '';
 $conf['admin_password'] = '';
+
+$conf['page_size'] = 150;

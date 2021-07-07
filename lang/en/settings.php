@@ -23,4 +23,6 @@ $lang['validate_o_none'] = 'Accept all certificates (no validation)';
 $lang['admin_username'] = 'A privileged user with access to all other user\'s data. Needed for certain actions like sending subscription mails.';
 $lang['admin_password'] = 'The password of the above user.';
 
+$lang['page_size'] = 'The maximum number of results to retrieve from the server in one request. Larger numbers speed up large queries but require more RAM.';
+
 
