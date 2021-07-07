@@ -30,9 +30,8 @@ class adclient_plugin_pureldap_test extends DokuWikiTest
                     'port' => 7636,
                     'admin_username' => 'vagrant@example.local',
                     'admin_password' => 'vagrant',
-                    'use_ssl' => true,
-                    'ssl_validate_cert' => false,
-                    #'ssl_allow_self_signed' => true,
+                    'encryption' => 'ssl',
+                    'validate' => 'self',
                 ],
                 $conf
             )
@@ -69,6 +68,10 @@ class adclient_plugin_pureldap_test extends DokuWikiTest
 
         // access should work without the domain, too
         $user = $client->getUser('a.legrand');
+        $this->assertSame($expect, $user);
+
+        // access should be case Insensitive
+        $user = $client->getUser('A.LeGrand');
         $this->assertSame($expect, $user);
     }
 

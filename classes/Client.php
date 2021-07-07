@@ -49,19 +49,28 @@ abstract class Client
         $defaults = [
             'defaultgroup' => 'user', // we expect this to be passed from global conf
             'domain' => '',
-            'use_tls' => false,
-            'use_ssl' => false,
             'port' => '',
+            'encryption' => false,
             'admin_username' => '',
             'admin_password' => '',
             'page_size' => 1000,
+            'use_ssl' => false,
+            'validate' => 'strict',
         ];
 
         $config = array_merge($defaults, $config);
 
         // default port depends on SSL setting
         if (!$config['port']) {
-            $config['port'] = $config['use_ssl'] ? 636 : 389;
+            $config['port'] = ($config['encryption'] === 'ssl') ? 636 : 389;
+        }
+
+        // set ssl parameters
+        $config['use_ssl'] = ($config['encryption'] === 'ssl');
+        if ($config['validate'] === 'none') {
+            $config['ssl_validate_cert'] = false;
+        } elseif ($config['validate'] === 'self') {
+            $config['ssl_allow_self_signed'] = true;
         }
 
         $config['domain'] = PhpString::strtolower($config['domain']);
@@ -90,7 +99,7 @@ abstract class Client
     {
         $user = $this->qualifiedUser($user);
 
-        if ($this->config['use_tls']) {
+        if ($this->config['encryption'] === 'tls') {
             try {
                 $this->ldap->startTls();
             } catch (OperationException $e) {
@@ -123,7 +132,20 @@ abstract class Client
      */
     public function getCachedUser($username, $fetchgroups = true)
     {
+        global $conf;
+
+        // memory cache first
         if (isset($this->userCache[$username])) {
+            if (!$fetchgroups || is_array($this->userCache[$username]['grps'])) {
+                return $this->userCache[$username];
+            }
+        }
+
+        // disk cache second
+        $cachename = getCacheName($username, '.pureldap-user');
+        $cachetime = @filemtime($cachename);
+        if ($cachetime && (time() - $cachetime) < $conf['auth_security_timeout']) {
+            $this->userCache[$username] = json_decode(file_get_contents($cachename), true);
             if (!$fetchgroups || is_array($this->userCache[$username]['grps'])) {
                 return $this->userCache[$username];
             }
@@ -135,6 +157,7 @@ abstract class Client
         // store in cache
         if ($info !== null) {
             $this->userCache[$username] = $info;
+            file_put_contents($cachename, json_encode($info));
         }
 
         return $info;
@@ -173,7 +196,6 @@ abstract class Client
      * @return string[]
      */
     abstract public function getGroups($match = null, $filtermethod = 'equal');
-
 
     /**
      * Construst the fully qualified name to identify a user

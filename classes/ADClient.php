@@ -181,7 +181,7 @@ class ADClient extends Client
      *
      * @param Entry $userentry
      * @return array
-     * @todo implement nested group memberships
+     * @todo implement nested group memberships FIXME already correct?
      */
     protected function getUserGroups(Entry $userentry)
     {

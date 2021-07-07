@@ -5,10 +5,13 @@
  * @author Andreas Gohr <andi@splitbrain.org>
  */
 
-$conf['servers'] = '';
+$conf['base_dn'] = '';
+
+$conf['servers'] = [];
 $conf['port'] = '';
-$conf['use_tls'] = '';
-$conf['use_ssl'] = '';
+
+$conf['encryption'] = 'none';
+$conf['validate'] = 'strict';
+
 $conf['admin_user'] = '';
 $conf['admin_password'] = '';
-$conf['base_dn'] = '';

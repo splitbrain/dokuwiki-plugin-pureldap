@@ -178,17 +178,10 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
         return array_slice($this->client->getCachedGroups(), $start, $limit);
     }
 
-    /**
-     * Return case sensitivity of the backend
-     *
-     * When your backend is caseinsensitive (eg. you can login with USER and
-     * user) then you need to overwrite this method and return false
-     *
-     * @return bool
-     */
+    /** @inheritDoc */
     public function isCaseSensitive()
     {
-        return true;
+        return false;
     }
 
     /**
@@ -205,7 +198,7 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
      */
     public function cleanUser($user)
     {
-        return $user;
+        return $this->client->qualifiedUser($user);
     }
 
     /**
@@ -228,34 +221,10 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
         return $group;
     }
 
-    /**
-     * Check Session Cache validity [implement only where required/possible]
-     *
-     * DokuWiki caches user info in the user's session for the timespan defined
-     * in $conf['auth_security_timeout'].
-     *
-     * This makes sure slow authentication backends do not slow down DokuWiki.
-     * This also means that changes to the user database will not be reflected
-     * on currently logged in users.
-     *
-     * To accommodate for this, the user manager plugin will touch a reference
-     * file whenever a change is submitted. This function compares the filetime
-     * of this reference file with the time stored in the session.
-     *
-     * This reference file mechanism does not reflect changes done directly in
-     * the backend's database through other means than the user manager plugin.
-     *
-     * Fast backends might want to return always false, to force rechecks on
-     * each page load. Others might want to use their own checking here. If
-     * unsure, do not override.
-     *
-     * @param string $user - The username
-     *
-     * @return bool
-     */
+    /** @inheritDoc */
     public function useSessionCache($user)
     {
-        return false;
+        return true;
     }
 
     /**
