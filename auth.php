@@ -198,7 +198,7 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
      */
     public function cleanUser($user)
     {
-        return $this->client->qualifiedUser($user);
+        return $this->client->cleanUser($user);
     }
 
     /**

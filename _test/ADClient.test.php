@@ -26,9 +26,10 @@ class adclient_plugin_pureldap_test extends DokuWikiTest
             array_merge(
                 [
                     'base_dn' => 'DC=example,DC=local',
+                    'suffix' => 'example.local',
                     'servers' => ['localhost'],
                     'port' => 7636,
-                    'admin_username' => 'vagrant@example.local',
+                    'admin_username' => 'vagrant',
                     'admin_password' => 'vagrant',
                     'encryption' => 'ssl',
                     'validate' => 'self',
@@ -45,7 +46,7 @@ class adclient_plugin_pureldap_test extends DokuWikiTest
     public function test_getUser()
     {
         $expect = [
-            'user' => 'a.legrand@example.local',
+            'user' => 'a.legrand',
             'name' => 'Amerigo Legrand',
             'mail' => 'a.legrand@example.com',
             'dn' => 'CN=Amerigo Legrand,CN=Users,DC=example,DC=local',
@@ -59,12 +60,6 @@ class adclient_plugin_pureldap_test extends DokuWikiTest
         ];
 
         $client = $this->getClient();
-        $user = $client->getUser('a.legrand@example.local');
-        $this->assertSame($expect, $user);
-
-        // with domain set, we expect shorter user names
-        $expect['user'] = 'a.legrand';
-        $client = $this->getClient(['domain' => 'example.local']);
         $user = $client->getUser('a.legrand@example.local');
         $this->assertSame($expect, $user);
 
@@ -113,8 +108,8 @@ class adclient_plugin_pureldap_test extends DokuWikiTest
         $this->assertGreaterThan(20, count($users));
         $this->assertLessThan(150, count($users));
 
-        $this->assertArrayHasKey('a.blaskett@example.local', $users, 'This user should be in alpha');
-        $this->assertArrayNotHasKey('a.legrand@example.local', $users, 'This user is not in alpha');
+        $this->assertArrayHasKey('a.blaskett', $users, 'This user should be in alpha');
+        $this->assertArrayNotHasKey('a.legrand', $users, 'This user is not in alpha');
 
         $users = $client->getFilteredUsers(['grps' => 'alpha', 'name' => 'Andras'], 'startswith');
         $this->assertCount(1, $users);

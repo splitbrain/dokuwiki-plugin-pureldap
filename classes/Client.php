@@ -48,7 +48,7 @@ abstract class Client
     {
         $defaults = [
             'defaultgroup' => 'user', // we expect this to be passed from global conf
-            'domain' => '',
+            'suffix' => '',
             'port' => '',
             'encryption' => false,
             'admin_username' => '',
@@ -74,7 +74,7 @@ abstract class Client
             $config['ssl_allow_self_signed'] = true;
         }
 
-        $config['domain'] = PhpString::strtolower($config['domain']);
+        $config['suffix'] = PhpString::strtolower($config['suffix']);
 
         return $config;
     }
@@ -86,10 +86,10 @@ abstract class Client
     {
         if ($this->isAuthenticated) return true;
 
-        $user = $this->qualifiedUser($this->config['admin_username']);
+        $user = $this->prepareBindUser($this->config['admin_username']);
         $ok = $this->authenticate($user, $this->config['admin_password']);
-        if(!$ok) {
-            $this->debug('Administrative bind failed. Probably wrong user/password.', __FILE__, __LINE__);
+        if (!$ok) {
+            $this->error('Administrative bind failed. Probably wrong user/password.', __FILE__, __LINE__);
         }
         return $ok;
     }
@@ -104,7 +104,7 @@ abstract class Client
      */
     public function authenticate($user, $pass)
     {
-        $user = $this->qualifiedUser($user);
+        $user = $this->prepareBindUser($user);
 
         if ($this->config['encryption'] === 'tls') {
             try {
@@ -205,20 +205,31 @@ abstract class Client
     abstract public function getGroups($match = null, $filtermethod = 'equal');
 
     /**
-     * Construst the fully qualified name to identify a user
+     * Clean the user name for use in DokuWiki
      *
-     * @param string $username
+     * @param string $user
      * @return string
      */
-    abstract public function qualifiedUser($username);
+    abstract public function cleanUser($user);
 
     /**
-     * Simplify the username if possible
+     * Clean the group name for use in DokuWiki
      *
-     * @param string $username
+     * @param string $group
      * @return string
      */
-    abstract public function simpleUser($username);
+    abstract public function cleanGroup($group);
+
+    /**
+     * Inheriting classes may want to manipulate the user before binding
+     *
+     * @param string $user
+     * @return string
+     */
+    protected function prepareBindUser($user)
+    {
+        return $user;
+    }
 
     /**
      * Helper method to get the first value of the given attribute
@@ -269,6 +280,22 @@ abstract class Client
             throw new \RuntimeException('', 0, $e);
         }
         msg('[pureldap] ' . hsc($e->getMessage()) . ' at ' . $e->getFile() . ':' . $e->getLine(), -1);
+    }
+
+    /**
+     * Handle error output
+     *
+     * @param string $msg
+     * @param string $file
+     * @param int $line
+     */
+    protected function error($msg, $file, $line)
+    {
+        if (defined('DOKU_UNITTEST')) {
+            throw new \RuntimeException($msg . ' at ' . $file . ':' . $line);
+        }
+
+        msg('[pureldap] ' . hsc($msg) . ' at ' . $file . ':' . $line, -1);
     }
 
     /**

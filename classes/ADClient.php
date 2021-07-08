@@ -18,10 +18,11 @@ class ADClient extends Client
     public function getUser($username, $fetchgroups = true)
     {
         if (!$this->autoAuth()) return null;
+        $username = $this->simpleUser($username);
 
         $filter = Filters::and(
             Filters::equal('objectClass', 'user'),
-            Filters::equal('userPrincipalName', $this->qualifiedUser($username))
+            Filters::equal('sAMAccountName', $this->simpleUser($username))
         );
         $this->debug('Searching ' . $filter->toString(), __FILE__, __LINE__);
 
@@ -91,7 +92,7 @@ class ADClient extends Client
 
         $filter = Filters::and(Filters::equal('objectClass', 'user'));
         if (isset($match['user'])) {
-            $filter->add(Filters::$filtermethod('userPrincipalName', $match['user']));
+            $filter->add(Filters::$filtermethod('sAMAccountName', $this->simpleUser($match['user'])));
         }
         if (isset($match['name'])) {
             $filter->add(Filters::$filtermethod('displayName', $match['name']));
@@ -132,36 +133,48 @@ class ADClient extends Client
         return $users;
     }
 
-    /**
-     * @inheritDoc
-     * userPrincipalName in the form <user>@<domain>
-     */
-    public function qualifiedUser($user)
+    /** @inheritDoc */
+    public function cleanUser($user)
     {
-        $user = PhpString::strtolower($user);
-        if (!$this->config['domain']) return $user;
+        return $this->simpleUser($user);
+    }
 
-        list($user, $domain) = explode('@', $user, 2);
-        if (!$domain) {
-            $domain = $this->config['domain'];
-        }
+    /** @inheritDoc */
+    public function cleanGroup($group)
+    {
+        return PhpString::strtolower($group);
+    }
 
-        return $user . '@' . $domain;
+    /** @inheritDoc */
+    public function prepareBindUser($user)
+    {
+        $user = $this->qualifiedUser($user); // add account suffix
+        return $user;
     }
 
     /**
      * @inheritDoc
-     * Removes the account suffix from the given user
+     * userPrincipalName in the form <user>@<suffix>
      */
-    public function simpleUser($user)
+    protected function qualifiedUser($user)
+    {
+        $user = $this->simpleUser($user); // strip any existing qualifiers
+        if(!$this->config['suffix']) {
+            $this->error('No account suffix set. Logins may fail.', __FILE__, __LINE__);
+        }
+
+        return $user . '@' . $this->config['suffix'];
+    }
+
+    /**
+     * @inheritDoc
+     * Removes the account suffix from the given user. Should match the SAMAccountName
+     */
+    protected function simpleUser($user)
     {
         $user = PhpString::strtolower($user);
-        if (!$this->config['domain']) return $user;
-
-        // strip account suffix
-        list($luser, $suffix) = explode('@', $user, 2);
-        if ($suffix === $this->config['domain']) return $luser;
-
+        $user = preg_replace('/@.*$/', '', $user);
+        $user = preg_replace('/^.*\\\\/', '', $user);
         return $user;
     }
 
@@ -174,7 +187,7 @@ class ADClient extends Client
     protected function entry2User(Entry $entry)
     {
         $user = [
-            'user' => $this->simpleUser($this->attr2str($entry->get('UserPrincipalName'))),
+            'user' => $this->simpleUser($this->attr2str($entry->get('sAMAccountName'))),
             'name' => $this->attr2str($entry->get('DisplayName')) ?: $this->attr2str($entry->get('Name')),
             'mail' => $this->attr2str($entry->get('mail')),
             'dn' => $entry->getDn()->toString(),
@@ -207,7 +220,7 @@ class ADClient extends Client
         if ($userentry->has('memberOf')) {
             foreach ($userentry->get('memberOf')->getValues() as $dn) {
                 list($cn) = explode(',', $dn, 2);
-                $groups[] = PhpString::strtolower(substr($cn, 3));
+                $groups[] = $this->cleanGroup(substr($cn, 3));
             }
         }
 
@@ -215,7 +228,7 @@ class ADClient extends Client
         // http://support.microsoft.com/?kbid=321360
         $gid = $userentry->get('primaryGroupID')->firstValue();
         if ($gid == 513) {
-            $groups[] = 'domain users';
+            $groups[] = $this->cleanGroup('domain users');
         }
 
         sort($groups);
@@ -226,7 +239,7 @@ class ADClient extends Client
     protected function userAttributes()
     {
         $attr = parent::userAttributes();
-        $attr[] = new Attribute('UserPrincipalName');
+        $attr[] = new Attribute('sAMAccountName');
         $attr[] = new Attribute('Name');
         $attr[] = new Attribute('primaryGroupID');
         $attr[] = new Attribute('memberOf');
