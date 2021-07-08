@@ -276,10 +276,15 @@ abstract class Client
      */
     protected function fatal(\Exception $e)
     {
+        if (class_exists('\dokuwiki\ErrorHandler')) {
+            \dokuwiki\ErrorHandler::logException($e);
+        }
+
         if (defined('DOKU_UNITTEST')) {
             throw new \RuntimeException('', 0, $e);
         }
-        msg('[pureldap] ' . hsc($e->getMessage()) . ' at ' . $e->getFile() . ':' . $e->getLine(), -1);
+
+        msg('[pureldap] ' . hsc($e->getMessage()), -1);
     }
 
     /**
@@ -291,11 +296,15 @@ abstract class Client
      */
     protected function error($msg, $file, $line)
     {
+        if (class_exists('\dokuwiki\Logger')) {
+            \dokuwiki\Logger::error('[pureldap] ' . $msg, '', $file, $line);
+        }
+
         if (defined('DOKU_UNITTEST')) {
             throw new \RuntimeException($msg . ' at ' . $file . ':' . $line);
         }
 
-        msg('[pureldap] ' . hsc($msg) . ' at ' . $file . ':' . $line, -1);
+        msg('[pureldap] ' . hsc($msg), -1);
     }
 
     /**
@@ -307,6 +316,14 @@ abstract class Client
      */
     protected function debug($msg, $file, $line)
     {
-        msg('[pureldap] ' . hsc($msg) . ' at ' . $file . ':' . $line, 0);
+        global $conf;
+
+        if (class_exists('\dokuwiki\Logger')) {
+            \dokuwiki\Logger::debug('[pureldap] ' . $msg, '', $file, $line);
+        }
+
+        if ($conf['allowdebug']) {
+            msg('[pureldap] ' . hsc($msg) . ' at ' . $file . ':' . $line, 0);
+        }
     }
 }
