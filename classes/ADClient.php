@@ -48,10 +48,11 @@ class ADClient extends Client
             Filters::equal('objectClass', 'group')
         );
         if ($match !== null) {
-            // FIXME this is a workaround that removes regex anchors as passed by the groupuser plugin
-            // a proper fix requires splitbrain/dokuwiki#3028 to be properly fixed
+            // FIXME this is a workaround that removes regex anchors and quoting as passed by the groupuser plugin
+            // a proper fix requires splitbrain/dokuwiki#3028 to be implemented
             $match = ltrim($match, '^');
             $match = rtrim($match, '$');
+            $match = stripslashes($match);
 
             $filter->add(Filters::$filtermethod('cn', $match));
         }
