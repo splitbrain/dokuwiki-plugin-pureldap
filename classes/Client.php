@@ -13,6 +13,11 @@ require_once __DIR__ . '/../vendor/autoload.php';
 
 abstract class Client
 {
+    const FILTER_EQUAL = 'equal';
+    const FILTER_CONTAINS = 'contains';
+    const FILTER_STARTSWITH = 'startsWith';
+    const FILTER_ENDSWITH = 'endsWith';
+
     /** @var array the configuration */
     protected $config;
 
@@ -202,7 +207,7 @@ abstract class Client
      * @param string $filtermethod How to match the groups
      * @return string[]
      */
-    abstract public function getGroups($match = null, $filtermethod = 'equal');
+    abstract public function getGroups($match = null, $filtermethod = self::FILTER_EQUAL);
 
     /**
      * Clean the user name for use in DokuWiki

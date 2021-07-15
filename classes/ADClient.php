@@ -40,7 +40,7 @@ class ADClient extends Client
     }
 
     /** @inheritDoc */
-    public function getGroups($match = null, $filtermethod = 'equal')
+    public function getGroups($match = null, $filtermethod = self::FILTER_EQUAL)
     {
         if (!$this->autoAuth()) return [];
 
@@ -71,7 +71,7 @@ class ADClient extends Client
 
             foreach ($entries as $entry) {
                 /** @var Entry $entry */
-                $groups[$entry->getDn()->toString()] = $this->attr2str($entry->get('cn'));
+                $groups[$entry->getDn()->toString()] = $this->cleanGroup($this->attr2str($entry->get('cn')));
             }
         }
 
@@ -86,7 +86,7 @@ class ADClient extends Client
      * @param string $filtermethod The method to use for filtering
      * @return array
      */
-    public function getFilteredUsers($match, $filtermethod = 'equal')
+    public function getFilteredUsers($match, $filtermethod = self::FILTER_EQUAL)
     {
         if (!$this->autoAuth()) return [];
 
@@ -105,6 +105,12 @@ class ADClient extends Client
             $groups = $this->getGroups($match['grps'], $filtermethod);
             $or = Filters::or();
             foreach ($groups as $dn => $group) {
+                // domain users membership is in primary group
+                if ($group === 'domain users') {
+                    $or->add(Filters::equal('primaryGroupID', 513));
+                    continue;
+                }
+
                 $or->add(Filters::equal('memberOf', $dn));
             }
             $filter->add($or);
@@ -159,7 +165,7 @@ class ADClient extends Client
     protected function qualifiedUser($user)
     {
         $user = $this->simpleUser($user); // strip any existing qualifiers
-        if(!$this->config['suffix']) {
+        if (!$this->config['suffix']) {
             $this->error('No account suffix set. Logins may fail.', __FILE__, __LINE__);
         }
 
