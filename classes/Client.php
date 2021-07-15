@@ -51,19 +51,11 @@ abstract class Client
      */
     protected function prepareConfig($config)
     {
-        $defaults = [
-            'defaultgroup' => 'user', // we expect this to be passed from global conf
-            'suffix' => '',
-            'port' => '',
-            'encryption' => false,
-            'admin_username' => '',
-            'admin_password' => '',
-            'page_size' => 150,
-            'use_ssl' => false,
-            'validate' => 'strict',
-            'primarygroup' => 'domain users',
-            'attributes' => [],
-        ];
+        // ensure we have the default keys
+        /** @var array $conf */
+        include __DIR__ . '/../conf/default.php';
+        $defaults = $conf;
+        $defaults['defaultgroup'] = 'user'; // we expect this to be passed from global conf
 
         $config = array_merge($defaults, $config);
 
