@@ -18,6 +18,7 @@ $meta['admin_username'] = array('string');
 $meta['admin_password'] = array('password');
 
 $meta['attributes'] = array('array');
+$meta['primarygroup'] = array('string');
 $meta['page_size'] = array('numeric', '_min' => 1);
 
 
