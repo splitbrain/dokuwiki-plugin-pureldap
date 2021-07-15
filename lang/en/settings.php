@@ -6,6 +6,7 @@
  */
 
 $lang['base_dn'] = 'Your base DN. Eg. <code>DC=my,DC=domain,DC=org</code>';
+$lang['suffix'] = 'Your account suffix. Eg. <code>my.domain.org</code>';
 
 $lang['servers'] = 'Comma-separated list of your LDAP/AD servers. Servers are tried in order until one connects.';
 $lang['port'] = 'LDAP/AD server port. Empty for default port.';
@@ -24,6 +25,7 @@ $lang['admin_username'] = 'A privileged user with access to all other user\'s da
 $lang['admin_password'] = 'The password of the above user.';
 
 $lang['attributes'] = 'A comma separated list of additional attributes to fetch for users. May be used by some plugins.';
+$lang['primarygroup'] = 'The name of your users primary group. Usually a localized version of <code>Domain Users</code>, eg. <code>Domänen Benutzer</code>.';
 $lang['page_size'] = 'The maximum number of results to retrieve from the server in one request. Larger numbers speed up large queries but require more RAM.';
 
 

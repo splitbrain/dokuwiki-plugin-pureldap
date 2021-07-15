@@ -106,7 +106,7 @@ class ADClient extends Client
             $or = Filters::or();
             foreach ($groups as $dn => $group) {
                 // domain users membership is in primary group
-                if ($group === 'domain users') {
+                if ($group === $this->config['primarygroup']) {
                     $or->add(Filters::equal('primaryGroupID', 513));
                     continue;
                 }
@@ -252,5 +252,4 @@ class ADClient extends Client
 
         return $attr;
     }
-
 }

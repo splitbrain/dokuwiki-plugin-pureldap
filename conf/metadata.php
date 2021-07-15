@@ -6,6 +6,7 @@
  */
 
 $meta['base_dn'] = array('string');
+$meta['suffix'] = array('string');
 
 $meta['servers'] = array('array');
 $meta['port'] = array('string');

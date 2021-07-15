@@ -61,6 +61,7 @@ abstract class Client
             'page_size' => 150,
             'use_ssl' => false,
             'validate' => 'strict',
+            'primarygroup' => 'domain users',
             'attributes' => [],
         ];
 
@@ -80,6 +81,7 @@ abstract class Client
         }
 
         $config['suffix'] = PhpString::strtolower($config['suffix']);
+        $config['primarygroup'] = $this->cleanGroup($config['primarygroup']);
 
         return $config;
     }

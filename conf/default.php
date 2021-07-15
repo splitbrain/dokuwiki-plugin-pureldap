@@ -6,6 +6,7 @@
  */
 
 $conf['base_dn'] = '';
+$conf['suffix'] = '';
 
 $conf['servers'] = array();
 $conf['port'] = '';
@@ -17,4 +18,5 @@ $conf['admin_username'] = '';
 $conf['admin_password'] = '';
 
 $conf['attributes'] = array();
+$conf['primarygroup'] = 'Domain Users';
 $conf['page_size'] = 150;
