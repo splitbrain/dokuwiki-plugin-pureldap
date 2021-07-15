@@ -113,6 +113,10 @@ class adclient_plugin_pureldap_test extends DokuWikiTest
 
         $users = $client->getFilteredUsers(['grps' => 'alpha', 'name' => 'Andras'], 'startswith');
         $this->assertCount(1, $users);
+
+        // a group with a space
+        $users = $client->getFilteredUsers(['grps' => 'gamma nested'], 'equal');
+        $this->assertArrayHasKey('m.mcnevin', $users, 'This user should be in Gamma Nested');
     }
 
 }
