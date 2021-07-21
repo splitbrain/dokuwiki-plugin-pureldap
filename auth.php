@@ -37,46 +37,6 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
         $this->success = true;
     }
 
-
-    /**
-     * Log off the current user [ OPTIONAL ]
-     */
-    // public function logOff()
-    // {
-    // }
-
-    /**
-     * Do all authentication [ OPTIONAL ]
-     *
-     * @param string $user Username
-     * @param string $pass Cleartext Password
-     * @param bool $sticky Cookie should not expire
-     *
-     * @return  bool             true on successful auth
-     */
-    //public function trustExternal($user, $pass, $sticky = false)
-    //{
-    /* some example:
-
-    global $USERINFO;
-    global $conf;
-    $sticky ? $sticky = true : $sticky = false; //sanity check
-
-    // do the checking here
-
-    // set the globals if authed
-    $USERINFO['name'] = 'FIXME';
-    $USERINFO['mail'] = 'FIXME';
-    $USERINFO['grps'] = array('FIXME');
-    $_SERVER['REMOTE_USER'] = $user;
-    $_SESSION[DOKU_COOKIE]['auth']['user'] = $user;
-    $_SESSION[DOKU_COOKIE]['auth']['pass'] = $pass;
-    $_SESSION[DOKU_COOKIE]['auth']['info'] = $USERINFO;
-    return true;
-
-    */
-    //}
-
     /** @inheritDoc */
     public function checkPass($user, $pass)
     {
@@ -103,62 +63,6 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
         return $info ?: false;
     }
 
-    /**
-     * Create a new User [implement only where required/possible]
-     *
-     * Returns false if the user already exists, null when an error
-     * occurred and true if everything went well.
-     *
-     * The new user HAS TO be added to the default group by this
-     * function!
-     *
-     * Set addUser capability when implemented
-     *
-     * @param string $user
-     * @param string $pass
-     * @param string $name
-     * @param string $mail
-     * @param null|array $grps
-     *
-     * @return bool|null
-     */
-    //public function createUser($user, $pass, $name, $mail, $grps = null)
-    //{
-    // FIXME implement
-    //    return null;
-    //}
-
-    /**
-     * Modify user data [implement only where required/possible]
-     *
-     * Set the mod* capabilities according to the implemented features
-     *
-     * @param string $user nick of the user to be changed
-     * @param array $changes array of field/value pairs to be changed (password will be clear text)
-     *
-     * @return  bool
-     */
-    //public function modifyUser($user, $changes)
-    //{
-    // FIXME implement
-    //    return false;
-    //}
-
-    /**
-     * Delete one or more users [implement only where required/possible]
-     *
-     * Set delUser capability when implemented
-     *
-     * @param array $users
-     *
-     * @return  int    number of users deleted
-     */
-    //public function deleteUsers($users)
-    //{
-    // FIXME implement
-    //    return false;
-    //}
-
     /** @inheritDoc */
     public function retrieveUsers($start = 0, $limit = 0, $filter = null)
     {
@@ -170,21 +74,6 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
             $start,
             $limit);
     }
-
-    /**
-     * Define a group [implement only where required/possible]
-     *
-     * Set addGroup capability when implemented
-     *
-     * @param string $group
-     *
-     * @return  bool
-     */
-    //public function addGroup($group)
-    //{
-    // FIXME implement
-    //    return false;
-    //}
 
     /** @inheritDoc */
     public function retrieveGroups($start = 0, $limit = 0)
@@ -198,38 +87,13 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
         return false;
     }
 
-    /**
-     * Sanitize a given username
-     *
-     * This function is applied to any user name that is given to
-     * the backend and should also be applied to any user name within
-     * the backend before returning it somewhere.
-     *
-     * This should be used to enforce username restrictions.
-     *
-     * @param string $user username
-     * @return string the cleaned username
-     */
+    /** @inheritDoc */
     public function cleanUser($user)
     {
         return $this->client->cleanUser($user);
     }
 
-    /**
-     * Sanitize a given groupname
-     *
-     * This function is applied to any groupname that is given to
-     * the backend and should also be applied to any groupname within
-     * the backend before returning it somewhere.
-     *
-     * This should be used to enforce groupname restrictions.
-     *
-     * Groupnames are to be passed without a leading '@' here.
-     *
-     * @param string $group groupname
-     *
-     * @return string the cleaned groupname
-     */
+    /** @inheritDoc */
     public function cleanGroup($group)
     {
         return $group;
@@ -244,7 +108,7 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
     /**
      * Convert DokuWiki filter type to method in the library
      *
-     * @todo implement with proper constants once #3028 has been implemented
+     * @todo implement with proper constants once splitbrain/dokuwiki#3028 has been implemented
      * @param string $type
      * @return string
      */
