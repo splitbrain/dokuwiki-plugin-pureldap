@@ -112,6 +112,20 @@ abstract class Client
     }
 
     /**
+     * Access to the config values
+     *
+     * Because the client class does configuration cleanup, the auth class should access
+     * config values through the client
+     *
+     * @param string $key
+     * @return mixed returns null on missing config
+     */
+    public function getConf($key) {
+        if(!isset($this->config[$key])) return null;
+        return $this->config[$key];
+    }
+
+    /**
      * Authenticate as admin
      */
     public function autoAuth()

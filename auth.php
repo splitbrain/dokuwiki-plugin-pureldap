@@ -22,15 +22,18 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
         global $conf;
         parent::__construct(); // for compatibility
 
-        $this->cando['getUsers'] = true;
-        $this->cando['getGroups'] = true;
-
         // prepare the base client
         $this->loadConfig();
         $this->conf['admin_password'] = conf_decodeString($this->conf['admin_password']);
         $this->conf['defaultgroup'] = $conf['defaultgroup'];
 
         $this->client = new ADClient($this->conf); // FIXME decide class on config
+
+        // set capabilities
+        $this->cando['getUsers'] = true;
+        $this->cando['getGroups'] = true;
+        $this->cando['logout'] = !$this->client->getConf('sso');
+
         $this->success = true;
     }
 
@@ -81,7 +84,7 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
 
         // when SSO is enabled, the login is autotriggered and we simply trust the environment
         if (
-            $this->conf['sso'] &&
+            $this->client->getConf('sso') &&
             $INPUT->server->str('REMOTE_USER') !== '' &&
             $INPUT->server->str('REMOTE_USER') == $user
         ) {
