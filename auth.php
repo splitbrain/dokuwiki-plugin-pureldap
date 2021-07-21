@@ -77,6 +77,17 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
     /** @inheritDoc */
     public function checkPass($user, $pass)
     {
+        global $INPUT;
+
+        // when SSO is enabled, the login is autotriggered and we simply trust the environment
+        if (
+            $this->conf['sso'] &&
+            $INPUT->server->str('REMOTE_USER') !== '' &&
+            $INPUT->server->str('REMOTE_USER') == $user
+        ) {
+            return true;
+        }
+
         // use a separate client from the default one, because this is not a superuser bind
         $client = new ADClient($this->conf); // FIXME decide class on config
         return $client->authenticate($user, $pass);

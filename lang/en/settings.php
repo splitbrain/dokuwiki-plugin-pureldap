@@ -28,4 +28,5 @@ $lang['attributes'] = 'A comma separated list of additional attributes to fetch 
 $lang['primarygroup'] = 'The name of your users primary group. Usually a localized version of <code>Domain Users</code>, eg. <code>Domänen-Benutzer</code>.';
 $lang['page_size'] = 'The maximum number of results to retrieve from the server in one request. Larger numbers speed up large queries but require more RAM.';
 
-
+$lang['sso'] = 'Use Single-Sign-On (SSO). This requires the appropriate web server setup.';
+$lang['sso_charset'] = 'If your webserver passes usernames in another charset than UTF-8, configure it here and make sure the iconv extension is available.';

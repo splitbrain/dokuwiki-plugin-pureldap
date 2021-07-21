@@ -40,6 +40,7 @@ abstract class Client
     public function __construct($config)
     {
         $this->config = $this->prepareConfig($config);
+        $this->prepareSSO();
         $this->ldap = new LdapClient($this->config);
     }
 
@@ -76,6 +77,38 @@ abstract class Client
         $config['primarygroup'] = $this->cleanGroup($config['primarygroup']);
 
         return $config;
+    }
+
+    /**
+     * Extract user info from environment for SSO
+     */
+    protected function prepareSSO()
+    {
+        global $INPUT;
+
+        if (!$this->config['sso']) return;
+        if ($INPUT->server->str('REMOTE_USER') === '') return;
+
+        $user = $INPUT->server->str('REMOTE_USER');
+
+        // make sure the right encoding is used
+        if ($this->config['sso_charset']) {
+            $user = iconv($this->config['sso_charset'], 'UTF-8', $user);
+        } elseif (!\dokuwiki\Utf8\Clean::isUtf8($user)) {
+            $user = utf8_encode($user);
+        }
+        $user = $this->cleanUser($user);
+
+        // Prepare SSO
+
+        // trust the incoming user
+        $INPUT->server->set('REMOTE_USER', $user);
+
+        // we need to simulate a login
+        if (empty($_COOKIE[DOKU_COOKIE])) {
+            $INPUT->set('u', $user);
+            $INPUT->set('p', 'sso_only');
+        }
     }
 
     /**

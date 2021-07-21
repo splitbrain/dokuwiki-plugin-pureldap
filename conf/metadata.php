@@ -21,4 +21,5 @@ $meta['attributes'] = array('array');
 $meta['primarygroup'] = array('string');
 $meta['page_size'] = array('numeric', '_min' => 1);
 
-
+$meta['sso'] = array('onoff');
+$meta['sso_charset'] = array('string');

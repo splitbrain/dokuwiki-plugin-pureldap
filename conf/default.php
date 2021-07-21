@@ -20,3 +20,6 @@ $conf['admin_password'] = '';
 $conf['attributes'] = array();
 $conf['primarygroup'] = 'Domain Users';
 $conf['page_size'] = 150;
+
+$conf['sso'] = 0;
+$conf['sso_charset'] = '';
