@@ -78,16 +78,17 @@ class adclient_plugin_pureldap_test extends DokuWikiTest
      */
     public function test_getUserRecursiveGroups()
     {
-        // This user is member of 'beta'. 'beta' contains 'gamma nested', we should report both
+        // This user is member of 'gamma nested', which is in turn part of 'beta'
+        // we should report both
         $expect = [
-                'beta',
-                'domain users',
-                'gamma nested',
-                'user',
-            ];
+            'beta',
+            'domain users',
+            'gamma nested',
+            'user',
+        ];
 
-        $client = $this->getClient();
-        $user = $client->getUser('g.riden@example.local');
+        $client = $this->getClient(['recursivegroups' => 1]);
+        $user = $client->getUser('m.albro@example.local');
         $this->assertSame($expect, $user['grps']);
     }
 

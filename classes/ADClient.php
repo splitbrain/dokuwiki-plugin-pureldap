@@ -11,8 +11,13 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
 
+/**
+ * Implement Active Directory Specifics
+ */
 class ADClient extends Client
 {
+    // see https://docs.microsoft.com/en-us/windows/win32/adsi/search-filter-syntax
+    const LDAP_MATCHING_RULE_IN_CHAIN = '1.2.840.113556.1.4.1941';
 
     /** @inheritDoc */
     public function getUser($username, $fetchgroups = true)
@@ -112,7 +117,7 @@ class ADClient extends Client
                     continue;
                 }
 
-                $or->add(Filters::equal('memberOf', $dn));
+                $or->add(Filters::equal('memberOf', $dn)); // FIXME handle recursive groups
             }
             $filter->add($or);
         }
@@ -221,18 +226,6 @@ class ADClient extends Client
     {
         $groups = [$this->config['defaultgroup']]; // always add default
 
-        if ($userentry->has('memberOf')) {
-            $groupsDNs = $userentry->get('memberOf')->getValues();
-            $groupsDNs = $this->getRecursiveGroups($groupsDNs);
-
-            foreach ($groupsDNs as $dn) {
-                // we simply take the first CN= part of the group DN and return it as the group name
-                // this should be correct for ActiveDirectory and saves us additional LDAP queries
-                list($cn) = explode(',', $dn, 2);
-                $groups[] = $this->cleanGroup(substr($cn, 3));
-            }
-        }
-
         // resolving the primary group in AD is complicated but basically never needed
         // http://support.microsoft.com/?kbid=321360
         $gid = $userentry->get('primaryGroupID')->firstValue();
@@ -240,61 +233,37 @@ class ADClient extends Client
             $groups[] = $this->cleanGroup('domain users');
         }
 
+        if ($this->config['recursivegroups']) {
+            // we do an additional query for the user's groups asking the AD server to resolve nested
+            // groups for us
+            if (!$this->autoAuth()) return $groups;
+            $filter = Filters::extensible('member', (string)$userentry->getDn(), self::LDAP_MATCHING_RULE_IN_CHAIN,
+                true);
+            $search = Operations::search($filter, 'name');
+            $paging = $this->ldap->paging($search);
+            while ($paging->hasEntries()) {
+                try {
+                    $entries = $paging->getEntries();
+                } catch (ProtocolException $e) {
+                    return $groups; // return what we have
+                }
+                /** @var Entry $entry */
+                foreach ($entries as $entry) {
+                    $groups[] = $this->cleanGroup(($entry->get('name')->getValues())[0]);
+                }
+            }
+
+        } elseif ($userentry->has('memberOf')) {
+            // we simply take the first CN= part of the group DN and return it as the group name
+            // this should be correct for ActiveDirectory and saves us additional LDAP queries
+            foreach ($userentry->get('memberOf')->getValues() as $dn) {
+                list($cn) = explode(',', $dn, 2);
+                $groups[] = $this->cleanGroup(substr($cn, 3));
+            }
+        }
+
         sort($groups);
         return $groups;
-    }
-
-    /**
-     * Extend the given $allDNs list of group DN names with all sub groups
-     *
-     * This runs bulk retrievals for all given groups instead of fetching individual groups
-     *
-     * @param string[] $allDNs
-     * @param string[] $checkDNs only used during recursion
-     * @return string[] list of all group DNs
-     * @todo decide if and how we want to cache these
-     */
-    protected function getRecursiveGroups($allDNs, $checkDNs = [])
-    {
-        if (!$this->autoAuth()) return [];
-        if (!count($checkDNs)) $checkDNs = $allDNs;
-
-        // find all sub groups of the given groups
-        $filter = Filters::or();
-        foreach ($checkDNs as $dn) {
-            $filter->add(Filters::equal('memberOf', $dn));
-        }
-        $filter = Filters::and(
-            Filters::equal('objectCategory', 'group'),
-            $filter
-        );
-        $search = Operations::search($filter, 'cn', 'member', 'memberof');
-        $paging = $this->ldap->paging($search);
-
-        // go through all found sub groups and remember the new ones
-        $subgroupDNs = [];
-        while ($paging->hasEntries()) {
-            try {
-                $entries = $paging->getEntries();
-            } catch (ProtocolException $e) {
-                $this->fatal($e);
-                return $allDNs; // return higher levels as found so far
-            }
-
-            /** @var Entry $entry */
-            foreach ($entries as $entry) {
-                $dn = $entry->getDn();
-                if (in_array($dn, $allDNs)) continue; // we have this one already
-                $allDNs[] = $dn; // keep this one
-                $subgroupDNs[] = $dn; // add it to be checked for subgroups
-            }
-        }
-
-        if (count($subgroupDNs)) {
-            $allDNs = $this->getRecursiveGroups($allDNs, $subgroupDNs);
-        }
-
-        return $allDNs;
     }
 
     /** @inheritDoc */

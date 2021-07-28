@@ -19,6 +19,7 @@ $conf['admin_password'] = '';
 
 $conf['attributes'] = array();
 $conf['primarygroup'] = 'Domain Users';
+$conf['recursivegroups'] = 0;
 $conf['page_size'] = 150;
 
 $conf['sso'] = 0;
