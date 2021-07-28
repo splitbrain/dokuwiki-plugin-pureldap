@@ -157,8 +157,8 @@ class ADClient extends Client
             }
 
             foreach ($entries as $entry) {
-                $userinfo = $this->entry2User($entry);
-                $users[$userinfo['user']] = $this->entry2User($entry);
+                $userinfo = $this->entry2User($entry, false);
+                $users[$userinfo['user']] = $userinfo;
             }
         }
 
