@@ -73,6 +73,25 @@ class adclient_plugin_pureldap_test extends DokuWikiTest
     }
 
     /**
+     * Check recursive groups
+     *
+     */
+    public function test_getUserRecursiveGroups()
+    {
+        // This user is member of 'beta'. 'beta' contains 'gamma nested', we should report both
+        $expect = [
+                'beta',
+                'domain users',
+                'gamma nested',
+                'user',
+            ];
+
+        $client = $this->getClient();
+        $user = $client->getUser('g.riden@example.local');
+        $this->assertSame($expect, $user['grps']);
+    }
+
+    /**
      * Check getting all groups
      */
     public function test_getGroups()
@@ -84,6 +103,7 @@ class adclient_plugin_pureldap_test extends DokuWikiTest
         $this->assertGreaterThan(3, count($groups));
         $this->assertContains('alpha', $groups);
         $this->assertContains('beta', $groups);
+        $this->assertContains('gamma nested', $groups);
         $this->assertContains('domain users', $groups);
     }
 
