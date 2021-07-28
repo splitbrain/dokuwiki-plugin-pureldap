@@ -10,6 +10,8 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
+use FreeDSx\Ldap\Search\Paging;
+use PHP_CodeSniffer\Filters\Filter;
 
 /**
  * Implement Active Directory Specifics
@@ -116,9 +118,28 @@ class ADClient extends Client
                     $or->add(Filters::equal('primaryGroupID', 513));
                     continue;
                 }
-
-                $or->add(Filters::equal('memberOf', $dn)); // FIXME handle recursive groups
+                // find members of this exact group
+                $or->add(Filters::equal('memberOf', $dn));
             }
+
+            // find members of the nested groups
+            // we resolve the nested groups first, before we're running the user query as this is usually
+            // faster than doing a full recursive user query. Unfortunately it is still pretty slow
+            if ($this->config['recursivegroups']) {
+                $paging = $this->resolveRecursiveMembership(array_keys($groups), 'memberOf');
+                while ($paging->hasEntries()) {
+                    try {
+                        $entries = $paging->getEntries();
+                    } catch (ProtocolException $e) {
+                        continue;
+                    }
+                    /** @var Entry $entry */
+                    foreach ($entries as $entry) {
+                        $or->add(Filters::equal('memberOf', (string)$entry->getDn()));
+                    }
+                }
+            }
+
             $filter->add($or);
         }
         $this->debug('Searching ' . $filter->toString(), __FILE__, __LINE__);
@@ -236,11 +257,7 @@ class ADClient extends Client
         if ($this->config['recursivegroups']) {
             // we do an additional query for the user's groups asking the AD server to resolve nested
             // groups for us
-            if (!$this->autoAuth()) return $groups;
-            $filter = Filters::extensible('member', (string)$userentry->getDn(), self::LDAP_MATCHING_RULE_IN_CHAIN,
-                true);
-            $search = Operations::search($filter, 'name');
-            $paging = $this->ldap->paging($search);
+            $paging = $this->resolveRecursiveMembership([(string)$userentry->getDn()]);
             while ($paging->hasEntries()) {
                 try {
                     $entries = $paging->getEntries();
@@ -264,6 +281,35 @@ class ADClient extends Client
 
         sort($groups);
         return $groups;
+    }
+
+    /**
+     * Get nested groups for the given DN
+     *
+     * @todo this is slow, doing many recursive calls might actually be faster
+     * @see https://stackoverflow.com/q/40024425
+     * @param string[] $DNs this can either be a user or group dn
+     * @param string $attribute Are we looking down (member) or up (memberOf)?
+     * @return Paging|null
+     */
+    protected function resolveRecursiveMembership($DNs, $attribute='member')
+    {
+        if (!$this->autoAuth()) return null;
+
+        $filter = Filters::or();
+        foreach ($DNs as $dn) {
+            $filter->add(
+                Filters::extensible($attribute, $dn, self::LDAP_MATCHING_RULE_IN_CHAIN, true)
+            );
+        }
+        $filter = Filters::and(
+            Filters::equal('objectCategory', 'group'),
+            $filter
+        );
+
+        $search = Operations::search($filter, 'name');
+        $paging = $this->ldap->paging($search);
+        return $paging;
     }
 
     /** @inheritDoc */

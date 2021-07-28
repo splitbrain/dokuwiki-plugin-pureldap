@@ -78,8 +78,8 @@ class adclient_plugin_pureldap_test extends DokuWikiTest
      */
     public function test_getUserRecursiveGroups()
     {
-        // This user is member of 'gamma nested', which is in turn part of 'beta'
-        // we should report both
+        // User m.albro is member of 'gamma nested', which is in turn part of 'beta'
+        // thus the user should be part of both groups
         $expect = [
             'beta',
             'domain users',
@@ -141,6 +141,20 @@ class adclient_plugin_pureldap_test extends DokuWikiTest
         $this->assertArrayHasKey('m.mcnevin', $users, 'This user should be in Gamma Nested');
     }
 
+    public function test_getFilteredUsersRecursiveGroups()
+    {
+        // User m.albro is member of 'gamma nested', which is in turn part of 'beta'
+        // thus the user should be part of both groups
+
+        $client = $this->getClient(['recursivegroups' => 1]);
+
+        $users = $client->getFilteredUsers(['grps' => 'beta'], ADClient::FILTER_EQUAL);
+        $this->assertArrayHasKey('m.albro', $users, 'user should be in beta');
+
+        $users = $client->getFilteredUsers(['grps' => 'gamma nested'], ADClient::FILTER_EQUAL);
+        $this->assertArrayHasKey('m.albro', $users, 'user should be in gamma nested');
+    }
+
     public function test_getDomainUsers()
     {
         $client = $this->getClient();
@@ -149,5 +163,22 @@ class adclient_plugin_pureldap_test extends DokuWikiTest
 
         $users = $client->getFilteredUsers(['grps' => 'domain'], ADClient::FILTER_STARTSWITH);
         $this->assertGreaterThan(250, count($users));
+    }
+
+    /**
+     * Check that we can resolve nested groups (users are checked in @see test_getUserRecursiveGroups already)
+     */
+    public function test_resolveRecursiveMembership() {
+        $client = $this->getClient();
+
+        /** @var \FreeDSx\Ldap\Search\Paging $result */
+        $result = $this->callInaccessibleMethod(
+            $client,
+            'resolveRecursiveMembership',
+            [['CN=beta,CN=Users,DC=example,DC=local'], 'memberOf']
+        );
+        $entries = $result->getEntries();
+        $this->assertEquals(1, $entries->count());
+        $this->assertEquals('Gamma Nested', ($entries->first()->get('name')->getValues())[0]);
     }
 }
