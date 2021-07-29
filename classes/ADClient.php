@@ -10,16 +10,17 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
-use FreeDSx\Ldap\Search\Paging;
-use PHP_CodeSniffer\Filters\Filter;
 
 /**
  * Implement Active Directory Specifics
  */
 class ADClient extends Client
 {
-    // see https://docs.microsoft.com/en-us/windows/win32/adsi/search-filter-syntax
-    const LDAP_MATCHING_RULE_IN_CHAIN = '1.2.840.113556.1.4.1941';
+    /**
+     * @var GroupHierarchyCache
+     * @see getGroupHierarchyCache
+     */
+    protected $gch = null;
 
     /** @inheritDoc */
     public function getUser($username, $fetchgroups = true)
@@ -111,37 +112,29 @@ class ADClient extends Client
         if (isset($match['grps'])) {
             // memberOf can not be checked with a substring match, so we need to get the right groups first
             $groups = $this->getGroups($match['grps'], $filtermethod);
+            $groupDNs = array_keys($groups);
+
+            if ($this->config['recursivegroups']) {
+                $gch = $this->getGroupHierarchyCache();
+                foreach ($groupDNs as $dn) {
+                    $groupDNs = array_merge($groupDNs, $gch->getChildren($dn));
+                }
+                $groupDNs = array_unique($groupDNs);
+            }
+
             $or = Filters::or();
-            foreach ($groups as $dn => $group) {
+            foreach ($groupDNs as $dn) {
                 // domain users membership is in primary group
-                if ($group === $this->config['primarygroup']) {
+                if ($this->dn2group($dn) === $this->config['primarygroup']) {
                     $or->add(Filters::equal('primaryGroupID', 513));
                     continue;
                 }
                 // find members of this exact group
                 $or->add(Filters::equal('memberOf', $dn));
             }
-
-            // find members of the nested groups
-            // we resolve the nested groups first, before we're running the user query as this is usually
-            // faster than doing a full recursive user query. Unfortunately it is still pretty slow
-            if ($this->config['recursivegroups']) {
-                $paging = $this->resolveRecursiveMembership(array_keys($groups), 'memberOf');
-                while ($paging->hasEntries()) {
-                    try {
-                        $entries = $paging->getEntries();
-                    } catch (ProtocolException $e) {
-                        continue;
-                    }
-                    /** @var Entry $entry */
-                    foreach ($entries as $entry) {
-                        $or->add(Filters::equal('memberOf', (string)$entry->getDn()));
-                    }
-                }
-            }
-
             $filter->add($or);
         }
+
         $this->debug('Searching ' . $filter->toString(), __FILE__, __LINE__);
         $attributes = $this->userAttributes();
         $search = Operations::search($filter, ...$attributes);
@@ -183,6 +176,20 @@ class ADClient extends Client
     {
         $user = $this->qualifiedUser($user); // add account suffix
         return $user;
+    }
+
+    /**
+     * Initializes the Group Cache for nested groups
+     *
+     * @return GroupHierarchyCache
+     */
+    public function getGroupHierarchyCache()
+    {
+        if ($this->gch === null) {
+            if (!$this->autoAuth()) return null;
+            $this->gch = new GroupHierarchyCache($this->ldap);
+        }
+        return $this->gch;
     }
 
     /**
@@ -245,71 +252,33 @@ class ADClient extends Client
      */
     protected function getUserGroups(Entry $userentry)
     {
-        $groups = [$this->config['defaultgroup']]; // always add default
+        $groups = [];
+
+        if ($userentry->has('memberOf')) {
+            $groupDNs = $userentry->get('memberOf')->getValues();
+
+            if ($this->config['recursivegroups']) {
+                $gch = $this->getGroupHierarchyCache();
+                foreach ($groupDNs as $dn) {
+                    $groupDNs = array_merge($groupDNs, $gch->getParents($dn));
+                }
+
+                $groupDNs = array_unique($groupDNs);
+            }
+            $groups = array_map([$this, 'dn2group'], $groupDNs);
+        }
+
+        $groups[] = $this->config['defaultgroup']; // always add default
 
         // resolving the primary group in AD is complicated but basically never needed
         // http://support.microsoft.com/?kbid=321360
         $gid = $userentry->get('primaryGroupID')->firstValue();
         if ($gid == 513) {
-            $groups[] = $this->cleanGroup('domain users');
-        }
-
-        if ($this->config['recursivegroups']) {
-            // we do an additional query for the user's groups asking the AD server to resolve nested
-            // groups for us
-            $paging = $this->resolveRecursiveMembership([(string)$userentry->getDn()]);
-            while ($paging->hasEntries()) {
-                try {
-                    $entries = $paging->getEntries();
-                } catch (ProtocolException $e) {
-                    return $groups; // return what we have
-                }
-                /** @var Entry $entry */
-                foreach ($entries as $entry) {
-                    $groups[] = $this->cleanGroup(($entry->get('name')->getValues())[0]);
-                }
-            }
-
-        } elseif ($userentry->has('memberOf')) {
-            // we simply take the first CN= part of the group DN and return it as the group name
-            // this should be correct for ActiveDirectory and saves us additional LDAP queries
-            foreach ($userentry->get('memberOf')->getValues() as $dn) {
-                list($cn) = explode(',', $dn, 2);
-                $groups[] = $this->cleanGroup(substr($cn, 3));
-            }
+            $groups[] = $this->cleanGroup($this->config['primarygroup']);
         }
 
         sort($groups);
         return $groups;
-    }
-
-    /**
-     * Get nested groups for the given DN
-     *
-     * @todo this is slow, doing many recursive calls might actually be faster
-     * @see https://stackoverflow.com/q/40024425
-     * @param string[] $DNs this can either be a user or group dn
-     * @param string $attribute Are we looking down (member) or up (memberOf)?
-     * @return Paging|null
-     */
-    protected function resolveRecursiveMembership($DNs, $attribute='member')
-    {
-        if (!$this->autoAuth()) return null;
-
-        $filter = Filters::or();
-        foreach ($DNs as $dn) {
-            $filter->add(
-                Filters::extensible($attribute, $dn, self::LDAP_MATCHING_RULE_IN_CHAIN, true)
-            );
-        }
-        $filter = Filters::and(
-            Filters::equal('objectCategory', 'group'),
-            $filter
-        );
-
-        $search = Operations::search($filter, 'name');
-        $paging = $this->ldap->paging($search);
-        return $paging;
     }
 
     /** @inheritDoc */
@@ -322,5 +291,17 @@ class ADClient extends Client
         $attr[] = new Attribute('memberOf');
 
         return $attr;
+    }
+
+    /**
+     * Extract the group name from the DN
+     *
+     * @param string $dn
+     * @return string
+     */
+    protected function dn2group($dn)
+    {
+        list($cn) = explode(',', $dn, 2);
+        return $this->cleanGroup(substr($cn, 3));
     }
 }
