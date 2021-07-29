@@ -62,19 +62,18 @@ class GroupHierarchyCache
      *
      * @param string $group
      * @param string $type
-     * @return string[]
+     * @param array $data list to fill
      */
-    protected function getHierarchy($group, $type)
+    protected function getHierarchy($group, $type, &$data)
     {
-        $dependents = []; // either parents or children
-        if (empty($this->groupHierarchy[$group][$type])) return $dependents;
+        if (empty($this->groupHierarchy[$group][$type])) return;
 
-        $dependents = $this->groupHierarchy[$group][$type];
-        foreach ($dependents as $parent) {
-            $dependents = array_merge($dependents, $this->getHierarchy($parent, $type));
+        $parents = $this->groupHierarchy[$group][$type];
+        foreach ($parents as $parent) {
+            if(in_array($parent,$data)) continue; // we did this one already
+            $data[] = $parent;
+            $this->getHierarchy($parent, $type, $data);
         }
-
-        return $dependents;
     }
 
     /**
@@ -84,7 +83,9 @@ class GroupHierarchyCache
      * @return string[]
      */
     public function getParents($group) {
-        return $this->getHierarchy($group, 'parents');
+        $parents = [];
+        $this->getHierarchy($group, 'parents', $parents);
+        return $parents;
     }
 
     /**
@@ -94,7 +95,9 @@ class GroupHierarchyCache
      * @return string[]
      */
     public function getChildren($group) {
-        return $this->getHierarchy($group, 'children');
+        $children = [];
+        $this->getHierarchy($group, 'children', $children);
+        return $children;
     }
 }
 
