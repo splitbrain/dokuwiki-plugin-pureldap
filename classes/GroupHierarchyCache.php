@@ -25,12 +25,17 @@ class GroupHierarchyCache
      * GroupHierarchyCache constructor.
      *
      * @param LdapClient $ldap
+     * @param bool $usefs Use filesystem caching?
      */
-    public function __construct(LdapClient $ldap)
+    public function __construct(LdapClient $ldap, $usefs)
     {
         $this->ldap = $ldap;
 
-        $this->groupHierarchy = $this->getCachedGroupList();
+        if($usefs) {
+            $this->groupHierarchy = $this->getCachedGroupList();
+        } else {
+            $this->groupHierarchy = $this->getGroupList();
+        }
     }
 
     /**

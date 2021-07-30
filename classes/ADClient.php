@@ -187,7 +187,7 @@ class ADClient extends Client
     {
         if ($this->gch === null) {
             if (!$this->autoAuth()) return null;
-            $this->gch = new GroupHierarchyCache($this->ldap);
+            $this->gch = new GroupHierarchyCache($this->ldap, $this->config['usefscache']);
         }
         return $this->gch;
     }

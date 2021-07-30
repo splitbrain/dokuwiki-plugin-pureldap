@@ -195,12 +195,14 @@ abstract class Client
         }
 
         // disk cache second
-        $cachename = getCacheName($username, '.pureldap-user');
-        $cachetime = @filemtime($cachename);
-        if ($cachetime && (time() - $cachetime) < $conf['auth_security_timeout']) {
-            $this->userCache[$username] = json_decode(file_get_contents($cachename), true);
-            if (!$fetchgroups || is_array($this->userCache[$username]['grps'])) {
-                return $this->userCache[$username];
+        if($this->config['usefscache']) {
+            $cachename = getCacheName($username, '.pureldap-user');
+            $cachetime = @filemtime($cachename);
+            if ($cachetime && (time() - $cachetime) < $conf['auth_security_timeout']) {
+                $this->userCache[$username] = json_decode(file_get_contents($cachename), true);
+                if (!$fetchgroups || is_array($this->userCache[$username]['grps'])) {
+                    return $this->userCache[$username];
+                }
             }
         }
 
@@ -208,7 +210,7 @@ abstract class Client
         $info = $this->getUser($username, $fetchgroups);
 
         // store in cache
-        if ($info !== null) {
+        if ($this->config['usefscache'] && $info !== null) {
             $this->userCache[$username] = $info;
             file_put_contents($cachename, json_encode($info));
         }

@@ -27,6 +27,7 @@ $lang['admin_password'] = 'The password of the above user.';
 $lang['attributes'] = 'A comma separated list of additional attributes to fetch for users. May be used by some plugins.';
 $lang['primarygroup'] = 'The name of your users primary group. Usually a localized version of <code>Domain Users</code>, eg. <code>Domänen-Benutzer</code>.';
 $lang['recursivegroups'] = 'Correctly fetch nested group memberships for users? Increases LDAP requests and load on the AD server.';
+$lang['usefscache'] = 'Cache LDAP data on disk to speed up reoccuring queries. Check the <code>securitytimeout</code> for the maximum cache time.';
 $lang['page_size'] = 'The maximum number of results to retrieve from the server in one request. Larger numbers speed up large queries but require more RAM.';
 
 $lang['sso'] = 'Use Single-Sign-On (SSO). This requires the appropriate web server setup.';
