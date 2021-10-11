@@ -309,6 +309,7 @@ abstract class Client
             new Attribute('dn'),
             new Attribute('displayName'),
             new Attribute('mail'),
+            new Attribute($this->config['userkey']),
         ];
         // additionals
         foreach ($this->config['attributes'] as $attribute) {

@@ -25,3 +25,10 @@ $meta['page_size'] = array('numeric', '_min' => 1);
 
 $meta['sso'] = array('onoff');
 $meta['sso_charset'] = array('string');
+
+$meta['usertree'] = array('string');
+$meta['userkey'] = array('string');
+$meta['userclass'] = array('string');
+$meta['grouptree'] = array('string');
+$meta['groupkey'] = array('string');
+$meta['groupclass'] = array('string');

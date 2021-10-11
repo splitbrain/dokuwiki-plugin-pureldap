@@ -25,3 +25,10 @@ $conf['page_size'] = 150;
 
 $conf['sso'] = 0;
 $conf['sso_charset'] = '';
+
+$conf['usertree'] = '';
+$conf['userkey'] = 'sAMAccountName';
+$conf['userclass'] = 'user';
+$conf['grouptree'] = '';
+$conf['groupkey'] = 'cn';
+$conf['groupclass'] = 'group';

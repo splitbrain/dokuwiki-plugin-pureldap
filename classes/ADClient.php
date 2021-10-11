@@ -29,15 +29,17 @@ class ADClient extends Client
         $username = $this->simpleUser($username);
 
         $filter = Filters::and(
-            Filters::equal('objectClass', 'user'),
-            Filters::equal('sAMAccountName', $this->simpleUser($username))
+            Filters::equal('objectClass', $this->config['userclass']),
+            Filters::equal($this->config['userkey'], $this->simpleUser($username))
         );
         $this->debug('Searching ' . $filter->toString(), __FILE__, __LINE__);
 
         try {
             /** @var Entries $entries */
             $attributes = $this->userAttributes();
-            $entries = $this->ldap->search(Operations::search($filter, ...$attributes));
+            $search = Operations::search($filter, ...$attributes);
+            if($this->config['usertree']) $search->setBaseDn($this->config['usertree']);
+            $entries = $this->ldap->search($search);
         } catch (OperationException $e) {
             $this->fatal($e);
             return null;
@@ -99,9 +101,9 @@ class ADClient extends Client
     {
         if (!$this->autoAuth()) return [];
 
-        $filter = Filters::and(Filters::equal('objectClass', 'user'));
+        $filter = Filters::and(Filters::equal('objectClass', $this->config['userclass']));
         if (isset($match['user'])) {
-            $filter->add(Filters::$filtermethod('sAMAccountName', $this->simpleUser($match['user'])));
+            $filter->add(Filters::$filtermethod($this->config['userkey'], $this->simpleUser($match['user'])));
         }
         if (isset($match['name'])) {
             $filter->add(Filters::$filtermethod('displayName', $match['name']));
@@ -207,8 +209,9 @@ class ADClient extends Client
     }
 
     /**
-     * @inheritDoc
      * Removes the account suffix from the given user. Should match the SAMAccountName
+     *
+     * @param string $user
      */
     protected function simpleUser($user)
     {
@@ -227,7 +230,7 @@ class ADClient extends Client
     protected function entry2User(Entry $entry)
     {
         $user = [
-            'user' => $this->simpleUser($this->attr2str($entry->get('sAMAccountName'))),
+            'user' => $this->simpleUser($this->attr2str($entry->get($this->config['userkey']))),
             'name' => $this->attr2str($entry->get('DisplayName')) ?: $this->attr2str($entry->get('Name')),
             'mail' => $this->attr2str($entry->get('mail')),
             'dn' => $entry->getDn()->toString(),
@@ -272,9 +275,11 @@ class ADClient extends Client
 
         // resolving the primary group in AD is complicated but basically never needed
         // http://support.microsoft.com/?kbid=321360
-        $gid = $userentry->get('primaryGroupID')->firstValue();
-        if ($gid == 513) {
-            $groups[] = $this->cleanGroup($this->config['primarygroup']);
+        if ($userentry->has('primaryGroupID')) {
+            $gid = $userentry->get('primaryGroupID')->firstValue();
+            if ($gid == 513) {
+                $groups[] = $this->cleanGroup($this->config['primarygroup']);
+            }
         }
 
         sort($groups);
