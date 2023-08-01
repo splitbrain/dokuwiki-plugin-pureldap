@@ -1,6 +1,28 @@
 CHANGELOG
 =========
 
+0.8.0 (2022-05-21)
+------------------
+* Properly handle and reap child processes in the LDAP server.
+* Handle POSIX signals sent to the LDAP server / child processes to properly shutdown existing clients.
+* Allow a PSR-3 compatible logging instance to be set on the LDAP server for info / error events.
+
+0.7.0 (2022-01-22)
+------------------
+* Add the ability to run the LDAP server / client over a UNIX socket.
+* Add the ability to run the LDAP server over an SSL / TLS only socket.
+* Add the ability for the server to handle client paging requests via a handler.
+* Add a helper factory method for creating a proxy LDAP server.
+* The LDAP server handlers can now be set as a class instance in addition to the class FQCN string.
+* When setting the options on the LdapClient you can now choose to force a disconnect at the same time.
+* The criticality for paging can now be set using the "isCritical" method.
+* Add integration tests for the LDAP server / proxy.
+
+0.6.1 (2021-12-11)
+------------------
+* Support PHP 8.0 / 8.1.
+* Updated PHPDocs for return types / exceptions / etc (@HenkPoley)
+
 0.6.0 (2019-12-14)
 ------------------
 * Add initial SASL support with a limited set of mechanisms (DIGEST-MD5, CRAM-MD5, PLAIN, ANONYMOUS).

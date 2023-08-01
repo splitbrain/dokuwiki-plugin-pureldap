@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -20,7 +21,7 @@ interface FilterContainerInterface extends FilterInterface
     /**
      * Add a filter.
      *
-     * @param FilterInterface[] ...$filters
+     * @param FilterInterface ...$filters
      * @return $this
      */
     public function add(FilterInterface ...$filters);
@@ -43,7 +44,7 @@ interface FilterContainerInterface extends FilterInterface
     /**
      * Remove a specific filter.
      *
-     * @param FilterInterface[] ...$filters
+     * @param FilterInterface ...$filters
      * @return $this
      */
     public function remove(FilterInterface ...$filters);
@@ -51,7 +52,7 @@ interface FilterContainerInterface extends FilterInterface
     /**
      * Set the filters.
      *
-     * @param FilterInterface[] ...$filters
+     * @param FilterInterface ...$filters
      * @return $this
      */
     public function set(FilterInterface ...$filters);

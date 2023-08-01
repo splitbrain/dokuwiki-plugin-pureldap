@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -10,11 +11,15 @@
 
 namespace FreeDSx\Ldap\Protocol;
 
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\ReferralException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
@@ -23,6 +28,7 @@ use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientProtocolContext;
 use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
+use FreeDSx\Sasl\Exception\SaslException;
 use FreeDSx\Socket\Exception\ConnectionException as SocketException;
 use FreeDSx\Socket\SocketPool;
 
@@ -33,7 +39,7 @@ use FreeDSx\Socket\SocketPool;
  */
 class ClientProtocolHandler
 {
-    const ROOTDSE_ATTRIBUTES = [
+    public const ROOTDSE_ATTRIBUTES = [
         'supportedSaslMechanisms',
         'supportedControl',
         'supportedLDAPVersion',
@@ -89,9 +95,17 @@ class ClientProtocolHandler
     /**
      * Make a single search request to fetch the RootDSE. Handle the various errors that could occur.
      *
+     * @param bool $reload
+     * @return Entry
      * @throws ConnectionException
      * @throws OperationException
+     * @throws SocketException
      * @throws UnsolicitedNotificationException
+     * @throws EncoderException
+     * @throws BindException
+     * @throws ProtocolException
+     * @throws ReferralException
+     * @throws SaslException
      */
     public function fetchRootDse(bool $reload = false): Entry
     {
@@ -118,9 +132,18 @@ class ClientProtocolHandler
     }
 
     /**
+     * @param RequestInterface $request
+     * @param Control ...$controls
+     * @return LdapMessageResponse|null
      * @throws ConnectionException
      * @throws OperationException
+     * @throws SocketException
      * @throws UnsolicitedNotificationException
+     * @throws EncoderException
+     * @throws BindException
+     * @throws ProtocolException
+     * @throws ReferralException
+     * @throws SaslException
      */
     public function send(RequestInterface $request, Control ...$controls): ?LdapMessageResponse
     {

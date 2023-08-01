@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -11,10 +12,12 @@
 namespace FreeDSx\Ldap\Search\Filter;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 
@@ -87,7 +90,12 @@ class NotFilter implements FilterInterface
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @param AbstractType $type
+     * @return NotFilter
+     * @throws ProtocolException
+     * @throws EncoderException
+     * @throws RuntimeException
      */
     public static function fromAsn1(AbstractType $type)
     {

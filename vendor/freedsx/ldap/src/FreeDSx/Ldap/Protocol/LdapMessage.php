@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -11,6 +12,8 @@
 namespace FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\IntegerType;
@@ -20,9 +23,11 @@ use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\Request;
 use FreeDSx\Ldap\Operation\Response;
 use FreeDSx\Socket\PduInterface;
+use function count;
 
 /**
  * The LDAP Message envelope (PDU). RFC 4511, 4.1.1
@@ -101,7 +106,9 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @return AbstractType
+     * @psalm-return SequenceType
+     * @throws EncoderException
      */
     public function toAsn1(): AbstractType
     {
@@ -110,7 +117,7 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
             $this->getOperationAsn1()
         );
 
-        if (\count($this->controls->toArray()) !== 0) {
+        if (count($this->controls->toArray()) !== 0) {
             /** @var SequenceOfType $controls */
             $controls = Asn1::context(0, Asn1::sequenceOf());
             foreach ($this->controls->toArray() as $control) {
@@ -123,7 +130,11 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return self
+     * @throws EncoderException
+     * @throws PartialPduException
+     * @throws RuntimeException
      */
     public static function fromAsn1(AbstractType $type)
     {
@@ -133,7 +144,7 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
                 get_class($type)
             ));
         }
-        $count = \count($type->getChildren());
+        $count = count($type->getChildren());
         if ($count < 2) {
             throw new ProtocolException(sprintf(
                 'Expected an ASN1 sequence with at least 2 elements, but it has %s',
@@ -149,9 +160,9 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
                     if (!$child instanceof IncompleteType) {
                         throw new ProtocolException('The ASN1 structure for the controls is malformed.');
                     }
-                    /** @var \FreeDSx\Asn1\Type\IncompleteType $child */
-                    $child = (new LdapEncoder())->complete($child, AbstractType::TAG_TYPE_SEQUENCE);
                     /** @var SequenceOfType $child */
+                    $child = (new LdapEncoder())->complete($child, AbstractType::TAG_TYPE_SEQUENCE);
+
                     foreach ($child->getChildren() as $control) {
                         if (!($control instanceof SequenceType && $control->getChild(0) !== null && $control->getChild(0) instanceof OctetStringType)) {
                             throw new ProtocolException('The control either is not a sequence or has no OID value attached.');
@@ -182,6 +193,7 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
         if (!($messageId !== null && $messageId instanceof IntegerType)) {
             throw new ProtocolException('Expected an LDAP message ID as an ASN.1 integer type. None received.');
         }
+        /** @var SequenceType|null $opAsn1 */
         $opAsn1 = $type->getChild(1);
         if ($opAsn1 === null) {
             throw new ProtocolException('The LDAP message is malformed.');

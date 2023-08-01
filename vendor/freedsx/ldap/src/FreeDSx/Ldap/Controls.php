@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -149,7 +150,7 @@ class Controls
     /**
      * Create a server side sort with a set of SortKey objects, or simple set of attribute names.
      *
-     * @param SortKey[]|string[] ...$sortKeys
+     * @param SortKey|string ...$sortKeys
      * @return SortingControl
      */
     public static function sort(...$sortKeys): SortingControl

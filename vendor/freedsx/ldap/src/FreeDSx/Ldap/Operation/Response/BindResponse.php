@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -11,8 +12,10 @@
 namespace FreeDSx\Ldap\Operation\Response;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\SequenceType;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\LdapResult;
 
 /**
@@ -26,6 +29,9 @@ use FreeDSx\Ldap\Operation\LdapResult;
  */
 class BindResponse extends LdapResult
 {
+    /**
+     * @var int
+     */
     protected $tagNumber = 1;
 
     /**
@@ -52,7 +58,8 @@ class BindResponse extends LdapResult
     }
 
     /**
-     * {@inheritdoc}
+     * @return SequenceType
+     * @throws ProtocolException
      */
     public function toAsn1(): AbstractType
     {
@@ -67,14 +74,15 @@ class BindResponse extends LdapResult
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return self
+     * @throws EncoderException
      */
     public static function fromAsn1(AbstractType $type)
     {
         [$resultCode, $dn, $diag, $ref] = self::parseResultData($type);
         $saslCreds = null;
 
-        /** @var SequenceType $type */
         foreach ($type->getChildren() as $child) {
             if ($child->getTagNumber() === 7 && $child->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC) {
                 $saslCreds = $child->getValue();

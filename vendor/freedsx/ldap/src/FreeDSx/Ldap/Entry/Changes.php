@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -10,15 +11,23 @@
 
 namespace FreeDSx\Ldap\Entry;
 
+use ArrayIterator;
+use Countable;
+use IteratorAggregate;
+use Traversable;
+use function array_search;
+use function count;
+
 /**
  * Represents a set of change objects.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class Changes implements \Countable, \IteratorAggregate
+class Changes implements Countable, IteratorAggregate
 {
     /**
      * @var Change[]
+     * @psalm-var list<Change>
      */
     protected $changes = [];
 
@@ -53,7 +62,7 @@ class Changes implements \Countable, \IteratorAggregate
      */
     public function has(Change $change)
     {
-        return \array_search($change, $this->changes, true) !== false;
+        return array_search($change, $this->changes, true) !== false;
     }
 
     /**
@@ -65,7 +74,7 @@ class Changes implements \Countable, \IteratorAggregate
     public function remove(Change ...$changes)
     {
         foreach ($changes as $change) {
-            if (($index = \array_search($change, $this->changes, true)) !== false) {
+            if (($index = array_search($change, $this->changes, true)) !== false) {
                 unset($this->changes[$index]);
             }
         }
@@ -107,18 +116,20 @@ class Changes implements \Countable, \IteratorAggregate
     }
 
     /**
-     * @return int
+     * @inheritDoc
+     * @psalm-return 0|positive-int
      */
-    public function count()
+    public function count(): int
     {
-        return \count($this->changes);
+        return count($this->changes);
     }
 
     /**
-     * @return \ArrayIterator|\Traversable
+     * @inheritDoc
+     * @psalm-return \ArrayIterator<int, Change>
      */
-    public function getIterator()
+    public function getIterator(): Traversable
     {
-        return new \ArrayIterator($this->changes);
+        return new ArrayIterator($this->changes);
     }
 }

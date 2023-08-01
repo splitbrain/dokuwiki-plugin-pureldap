@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -11,11 +12,14 @@
 namespace FreeDSx\Ldap\Control\Ad;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IntegerType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use function count;
 
 /**
  * Used to represent the Extended DN control.
@@ -59,7 +63,10 @@ class ExtendedDnControl extends Control
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return ExtendedDnControl
+     * @throws EncoderException
+     * @throws PartialPduException
      */
     public static function fromAsn1(AbstractType $type)
     {
@@ -105,7 +112,7 @@ class ExtendedDnControl extends Control
      */
     protected static function validate(AbstractType $type): void
     {
-        if (!($type instanceof SequenceType && \count($type) === 1)) {
+        if (!($type instanceof SequenceType && count($type) === 1)) {
             throw new ProtocolException('An ExtendedDn control value must be a sequence type with 1 child.');
         }
         if (!$type->getChild(0) instanceof IntegerType) {

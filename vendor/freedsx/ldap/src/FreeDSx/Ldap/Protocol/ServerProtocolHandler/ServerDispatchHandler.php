@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -10,6 +11,7 @@
 
 namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -27,7 +29,13 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
 class ServerDispatchHandler extends BaseServerHandler implements ServerProtocolHandlerInterface
 {
     /**
-     * {@inheritDoc}
+     * @param LdapMessageRequest $message
+     * @param TokenInterface $token
+     * @param RequestHandlerInterface $dispatcher
+     * @param ServerQueue $queue
+     * @param array $options
+     * @throws OperationException
+     * @throws EncoderException
      */
     public function handleRequest(LdapMessageRequest $message, TokenInterface $token, RequestHandlerInterface $dispatcher, ServerQueue $queue, array $options): void
     {

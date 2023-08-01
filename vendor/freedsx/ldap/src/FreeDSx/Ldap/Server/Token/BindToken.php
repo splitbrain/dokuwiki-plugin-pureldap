@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -45,7 +46,7 @@ class BindToken implements TokenInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @return string
      */
     public function getUsername(): ?string
     {
@@ -53,7 +54,7 @@ class BindToken implements TokenInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @return string
      */
     public function getPassword(): ?string
     {

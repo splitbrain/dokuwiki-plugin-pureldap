@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -11,6 +12,14 @@
 namespace FreeDSx\Ldap\Entry;
 
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
+use function array_keys;
+use function array_values;
+use function count;
+use function explode;
+use function preg_split;
+use function str_replace;
+use function substr;
+use function substr_replace;
 
 /**
  * Represents a Relative Distinguished Name.
@@ -77,7 +86,7 @@ class Rdn
      */
     public function isMultivalued(): bool
     {
-        return \count($this->additional) !== 0;
+        return count($this->additional) !== 0;
     }
 
     /**
@@ -105,10 +114,11 @@ class Rdn
     /**
      * @param string $rdn
      * @return Rdn
+     * @throws InvalidArgumentException
      */
     public static function create(string $rdn): Rdn
     {
-        $pieces = \preg_split('/(?<!\\\\)\+/', $rdn);
+        $pieces = preg_split('/(?<!\\\\)\+/', $rdn);
         if ($pieces === false) {
             throw new InvalidArgumentException(sprintf('The RDN "%s" is invalid.', $rdn));
         }
@@ -116,8 +126,8 @@ class Rdn
         // @todo Simplify this logic somehow?
         $obj = null;
         foreach ($pieces as $piece) {
-            $parts = \explode('=', $piece, 2);
-            if (\count($parts) !== 2) {
+            $parts = explode('=', $piece, 2);
+            if (count($parts) !== 2) {
                 throw new InvalidArgumentException(sprintf('The RDN "%s" is invalid.', $piece));
             }
             if ($obj === null) {
@@ -146,13 +156,13 @@ class Rdn
         if (self::shouldNotEscape($value)) {
             return $value;
         }
-        $value = \str_replace(\array_keys(self::ESCAPE_MAP), \array_values(self::ESCAPE_MAP), $value);
+        $value = str_replace(array_keys(self::ESCAPE_MAP), array_values(self::ESCAPE_MAP), $value);
 
         if ($value[0] === '#' || $value[0] === ' ') {
-            $value = ($value[0] === '#' ? '\23' : '\20') . \substr($value, 1);
+            $value = ($value[0] === '#' ? '\23' : '\20') . substr($value, 1);
         }
         if ($value[-1] === ' ') {
-            $value = \substr_replace($value, '\20', -1, 1);
+            $value = substr_replace($value, '\20', -1, 1);
         }
 
         return self::escapeNonPrintable($value);

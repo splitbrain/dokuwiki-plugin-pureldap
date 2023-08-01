@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -10,12 +11,19 @@
 
 namespace FreeDSx\Ldap\Entry;
 
+use ArrayIterator;
+use Countable;
+use IteratorAggregate;
+use Traversable;
+use function count;
+use function is_array;
+
 /**
  * Represents an Entry in LDAP.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class Entry implements \IteratorAggregate, \Countable
+class Entry implements IteratorAggregate, Countable
 {
     /**
      * @var Attribute[]
@@ -47,7 +55,7 @@ class Entry implements \IteratorAggregate, \Countable
      * Add an attribute and its values.
      *
      * @param string|Attribute $attribute
-     * @param string[] ...$values
+     * @param string ...$values
      * @return $this
      */
     public function add($attribute, ...$values)
@@ -68,14 +76,14 @@ class Entry implements \IteratorAggregate, \Countable
      * Remove an attribute's value(s).
      *
      * @param string|Attribute $attribute
-     * @param array ...$values
+     * @param mixed|string ...$values
      * @return $this
      */
     public function remove($attribute, ...$values)
     {
         $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute, ...$values);
 
-        if (\count($attribute->getValues()) !== 0) {
+        if (count($attribute->getValues()) !== 0) {
             if (($exists = $this->get($attribute, true)) !== null) {
                 $exists->remove(...$attribute->getValues());
             }
@@ -88,7 +96,7 @@ class Entry implements \IteratorAggregate, \Countable
     /**
      * Reset an attribute, which removes any values it may have.
      *
-     * @param string[]|Attribute[] ...$attributes
+     * @param string|Attribute ...$attributes
      * @return $this
      */
     public function reset(...$attributes)
@@ -111,7 +119,7 @@ class Entry implements \IteratorAggregate, \Countable
      * Set an attribute on the entry, replacing any value(s) that may exist on it.
      *
      * @param string|Attribute $attribute
-     * @param array ...$values
+     * @param mixed ...$values
      * @return $this
      */
     public function set($attribute, ...$values)
@@ -211,19 +219,21 @@ class Entry implements \IteratorAggregate, \Countable
     }
 
     /**
-     * @return \ArrayIterator
+     * @inheritDoc
+     * @psalm-return \ArrayIterator<array-key, Attribute>
      */
-    public function getIterator(): \ArrayIterator
+    public function getIterator(): Traversable
     {
-        return new \ArrayIterator($this->attributes);
+        return new ArrayIterator($this->attributes);
     }
 
     /**
      * @return int
+     * @psalm-return 0|positive-int
      */
     public function count(): int
     {
-        return \count($this->attributes);
+        return count($this->attributes);
     }
 
     public function __toString(): string
@@ -241,7 +251,7 @@ class Entry implements \IteratorAggregate, \Countable
      */
     public function __set(string $name, $value): void
     {
-        $this->set($name, ...(\is_array($value) ? $value : [$value]));
+        $this->set($name, ...(is_array($value) ? $value : [$value]));
     }
 
     public function __isset(string $name): bool
@@ -279,7 +289,7 @@ class Entry implements \IteratorAggregate, \Countable
         $entryAttr = [];
 
         foreach ($attributes as $attribute => $value) {
-            $entryAttr[] = new Attribute($attribute, ...(\is_array($value) ? $value : [$value]));
+            $entryAttr[] = new Attribute($attribute, ...(is_array($value) ? $value : [$value]));
         }
 
         return new self($dn, ...$entryAttr);

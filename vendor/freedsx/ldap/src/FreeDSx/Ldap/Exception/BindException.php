@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -10,11 +11,13 @@
 
 namespace FreeDSx\Ldap\Exception;
 
+use Exception;
+
 /**
  * Thrown on a failed bind attempt.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class BindException extends \Exception
+class BindException extends Exception
 {
 }

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -11,6 +12,7 @@
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
 use FreeDSx\Ldap\Exception\ConnectionException;
+use FreeDSx\Ldap\Exception\FilterParseException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ReferralException;
 use FreeDSx\Ldap\Exception\RuntimeException;
@@ -29,6 +31,8 @@ use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Protocol\ReferralContext;
 use FreeDSx\Ldap\ReferralChaserInterface;
 use FreeDSx\Ldap\Search\Filters;
+use Throwable;
+use function count;
 
 /**
  * Logic for handling referrals.
@@ -43,10 +47,20 @@ class ClientReferralHandler implements ResponseHandlerInterface
     protected $options = [];
 
     /**
-     * {@inheritDoc}
+     * @param LdapMessageRequest $messageTo
+     * @param LdapMessageResponse $messageFrom
+     * @param ClientQueue $queue
+     * @param array $options
+     * @return LdapMessageResponse|null
+     * @throws OperationException
+     * @throws ReferralException
      */
-    public function handleResponse(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom, ClientQueue $queue, array $options): ?LdapMessageResponse
-    {
+    public function handleResponse(
+        LdapMessageRequest $messageTo,
+        LdapMessageResponse $messageFrom,
+        ClientQueue $queue,
+        array $options
+    ): ?LdapMessageResponse {
         $this->options = $options;
         $result = $messageFrom->getResponse();
         switch ($this->options['referral']) {
@@ -55,10 +69,8 @@ class ClientReferralHandler implements ResponseHandlerInterface
                 $referrals = $result instanceof LdapResult ? $result->getReferrals() : [];
 
                 throw new ReferralException($message, ...$referrals);
-                break;
             case 'follow':
                 return $this->followReferral($messageTo, $messageFrom);
-                break;
             default:
                 throw new RuntimeException(sprintf(
                     'The referral option "%s" is invalid.',
@@ -67,6 +79,14 @@ class ClientReferralHandler implements ResponseHandlerInterface
         }
     }
 
+    /**
+     * @param LdapMessageRequest $messageTo
+     * @param LdapMessageResponse $messageFrom
+     * @return LdapMessageResponse|null
+     * @throws OperationException
+     * @throws SkipReferralException
+     * @throws FilterParseException
+     */
     protected function followReferral(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom): ?LdapMessageResponse
     {
         $referralChaser = $this->options['referral_chaser'];
@@ -76,7 +96,7 @@ class ClientReferralHandler implements ResponseHandlerInterface
                 ReferralChaserInterface::class
             ));
         }
-        if (!$messageFrom->getResponse() instanceof LdapResult || \count($messageFrom->getResponse()->getReferrals()) === 0) {
+        if (!$messageFrom->getResponse() instanceof LdapResult || count($messageFrom->getResponse()->getReferrals()) === 0) {
             throw new OperationException(
                 'Encountered a referral request, but no referrals were supplied.',
                 ResultCode::REFERRAL
@@ -147,7 +167,7 @@ class ClientReferralHandler implements ResponseHandlerInterface
                 }
                 # Other operation errors should bubble up, so throw it
                 throw  $e;
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 throw $e;
             }
         }
@@ -162,6 +182,7 @@ class ClientReferralHandler implements ResponseHandlerInterface
     /**
      * @param RequestInterface $request
      * @param LdapUrl $referral
+     * @throws FilterParseException
      */
     protected function mergeReferralOptions(RequestInterface $request, LdapUrl $referral): void
     {

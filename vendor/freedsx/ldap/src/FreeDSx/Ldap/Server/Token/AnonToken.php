@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -46,7 +47,7 @@ class AnonToken implements TokenInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @return null
      */
     public function getPassword(): ?string
     {

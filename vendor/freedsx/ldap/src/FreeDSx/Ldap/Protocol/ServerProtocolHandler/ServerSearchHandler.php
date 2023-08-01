@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -10,13 +11,7 @@
 
 namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
-use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\Operation\Request\SearchRequest;
-use FreeDSx\Ldap\Operation\Response\SearchResultDone;
-use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
-use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
-use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestContext;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
@@ -29,34 +24,33 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  */
 class ServerSearchHandler implements ServerProtocolHandlerInterface
 {
+    use ServerSearchTrait;
+
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
-    public function handleRequest(LdapMessageRequest $message, TokenInterface $token, RequestHandlerInterface $dispatcher, ServerQueue $queue, array $options): void
-    {
-        $context = new RequestContext($message->controls(), $token);
-        $request = $message->getRequest();
+    public function handleRequest(
+        LdapMessageRequest $message,
+        TokenInterface $token,
+        RequestHandlerInterface $dispatcher,
+        ServerQueue $queue,
+        array $options
+    ): void {
+        $context = new RequestContext(
+            $message->controls(),
+            $token
+        );
+        $request = $this->getSearchRequestFromMessage($message);
 
-        if (!$request instanceof SearchRequest) {
-            throw new RuntimeException(sprintf(
-                'Expected a search request, but got %s.',
-                get_class($request)
-            ));
-        }
-        $entries = $dispatcher->search($context, $request);
-
-        $messages = [];
-        foreach ($entries->toArray() as $entry) {
-            $messages[] = new LdapMessageResponse(
-                $message->getMessageId(),
-                new SearchResultEntry($entry)
-            );
-        }
-        $messages[] = new LdapMessageResponse(
-            $message->getMessageId(),
-            new SearchResultDone(ResultCode::SUCCESS)
+        $entries = $dispatcher->search(
+            $context,
+            $request
         );
 
-        $queue->sendMessage(...$messages);
+        $this->sendEntriesToClient(
+            $entries,
+            $message,
+            $queue
+        );
     }
 }

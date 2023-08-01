@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -11,6 +12,7 @@
 namespace FreeDSx\Ldap\Operation;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\SequenceType;
@@ -20,6 +22,8 @@ use FreeDSx\Ldap\Exception\UrlParseException;
 use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\Response\ResponseInterface;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
+use function array_map;
+use function count;
 
 /**
  * Represents the result of an operation request. RFC 4511, 4.1.9
@@ -147,7 +151,8 @@ class LdapResult implements ResponseInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @return AbstractType
+     * @throws ProtocolException
      */
     public function toAsn1(): AbstractType
     {
@@ -156,8 +161,8 @@ class LdapResult implements ResponseInterface
             Asn1::octetString($this->dn),
             Asn1::octetString($this->diagnosticMessage)
         );
-        if (\count($this->referrals) !== 0) {
-            $result->addChild(Asn1::context(3, Asn1::sequence(...\array_map(function ($v) {
+        if (count($this->referrals) !== 0) {
+            $result->addChild(Asn1::context(3, Asn1::sequence(...array_map(function ($v) {
                 return Asn1::octetString($v);
             }, $this->referrals))));
         }
@@ -169,7 +174,9 @@ class LdapResult implements ResponseInterface
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return self
+     * @throws EncoderException
      */
     public static function fromAsn1(AbstractType $type)
     {
@@ -181,7 +188,9 @@ class LdapResult implements ResponseInterface
     /**
      * @param AbstractType $type
      * @return array
+     * @psalm-return array{0: mixed, 1: mixed, 2: mixed, 3: list<LdapUrl>}
      * @throws ProtocolException
+     * @throws EncoderException
      */
     protected static function parseResultData(AbstractType $type)
     {
@@ -192,7 +201,7 @@ class LdapResult implements ResponseInterface
 
         # Somewhat ugly minor optimization. Though it's probably less likely for most setups to get referrals.
         # So only try to iterate them if we possibly have them.
-        $count = \count($type->getChildren());
+        $count = count($type->getChildren());
         if ($count > 3) {
             for ($i = 3; $i < $count; $i++) {
                 $child = $type->getChild($i);

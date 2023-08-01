@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -11,6 +12,7 @@
 namespace FreeDSx\Ldap\Search\Filter;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\OctetStringType;
@@ -45,7 +47,7 @@ class PresentFilter implements FilterInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @return string
      */
     public function toString(): string
     {
@@ -53,7 +55,11 @@ class PresentFilter implements FilterInterface
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @param AbstractType $type
+     * @return PresentFilter
+     * @throws ProtocolException
+     * @throws EncoderException
      */
     public static function fromAsn1(AbstractType $type)
     {

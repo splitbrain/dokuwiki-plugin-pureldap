@@ -1,12 +1,20 @@
 <?php
+
 /**
- * Created by PhpStorm.
- * User: Chad
- * Date: 1/1/2018
- * Time: 9:28 PM
+ * This file is part of the FreeDSx LDAP package.
+ *
+ * (c) Chad Sikorra <Chad.Sikorra@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
  */
 
 namespace FreeDSx\Ldap;
+
+use function array_keys;
+use function array_values;
+use function str_ireplace;
+use function str_replace;
 
 /**
  * Some common methods for LDAP URLs and URL Extensions.
@@ -40,14 +48,14 @@ trait LdapUrlTrait
     /**
      * Percent-encode certain values in the URL.
      *
-     * @param string $value
+     * @param null|string $value
      * @return string
      */
     protected static function encode(?string $value): string
     {
-        return \str_replace(
-            \array_keys(self::$escapeMap),
-            \array_values(self::$escapeMap),
+        return str_replace(
+            array_keys(self::$escapeMap),
+            array_values(self::$escapeMap),
             (string) $value
         );
     }
@@ -60,9 +68,9 @@ trait LdapUrlTrait
      */
     protected static function decode(string $value): string
     {
-        return \str_ireplace(
-            \array_values(self::$escapeMap),
-            \array_keys(self::$escapeMap),
+        return str_ireplace(
+            array_values(self::$escapeMap),
+            array_keys(self::$escapeMap),
             $value
         );
     }

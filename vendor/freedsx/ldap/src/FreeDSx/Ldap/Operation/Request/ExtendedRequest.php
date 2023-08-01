@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -11,11 +12,14 @@
 namespace FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
+use function count;
 
 /**
  * An Extended Request. RFC 4511, 4.12
@@ -109,7 +113,8 @@ class ExtendedRequest implements RequestInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @return AbstractType
+     * @throws EncoderException
      */
     public function toAsn1(): AbstractType
     {
@@ -130,7 +135,8 @@ class ExtendedRequest implements RequestInterface
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return self
      */
     public static function fromAsn1(AbstractType $type)
     {
@@ -141,6 +147,8 @@ class ExtendedRequest implements RequestInterface
      * @param AbstractType $type
      * @return AbstractType
      * @throws ProtocolException
+     * @throws EncoderException
+     * @throws PartialPduException
      */
     protected static function decodeEncodedValue(AbstractType $type): ?AbstractType
     {
@@ -153,10 +161,11 @@ class ExtendedRequest implements RequestInterface
      * @param AbstractType $type
      * @return array
      * @throws ProtocolException
+     * @psalm-return array{0: mixed, 1: mixed|null}
      */
     protected static function parseAsn1ExtendedRequest(AbstractType $type)
     {
-        if (!($type instanceof SequenceType && (\count($type) === 1 || \count($type) === 2))) {
+        if (!($type instanceof SequenceType && (count($type) === 1 || count($type) === 2))) {
             throw new ProtocolException('The extended request is malformed');
         }
         $oid = null;

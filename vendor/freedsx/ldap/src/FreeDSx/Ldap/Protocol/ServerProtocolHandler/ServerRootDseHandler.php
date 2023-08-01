@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -10,6 +11,8 @@
 
 namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
+use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
@@ -23,6 +26,7 @@ use FreeDSx\Ldap\Server\RequestContext;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use function count;
 
 /**
  * Handles RootDSE based search requests.
@@ -32,10 +36,25 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
 class ServerRootDseHandler implements ServerProtocolHandlerInterface
 {
     /**
-     * {@inheritDoc}
+     * @var RootDseHandlerInterface|null
      */
-    public function handleRequest(LdapMessageRequest $message, TokenInterface $token, RequestHandlerInterface $dispatcher, ServerQueue $queue, array $options): void
+    private $rootDseHandler;
+
+    public function __construct(?RootDseHandlerInterface $rootDseHandler = null)
     {
+        $this->rootDseHandler = $rootDseHandler;
+    }
+
+    /**
+     * @throws EncoderException
+     */
+    public function handleRequest(
+        LdapMessageRequest $message,
+        TokenInterface $token,
+        RequestHandlerInterface $dispatcher,
+        ServerQueue $queue,
+        array $options
+    ): void {
         $entry = Entry::fromArray('', [
             'namingContexts' => $options['dse_naming_contexts'] ?? '',
             'supportedExtension' => [
@@ -45,7 +64,16 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
             'vendorName' => $options['dse_vendor_name'] ?? '',
         ]);
         if (isset($options['ssl_cert'])) {
-            $entry->set('supportedExtension', ExtendedRequest::OID_START_TLS);
+            $entry->add(
+                'supportedExtension',
+                ExtendedRequest::OID_START_TLS
+            );
+        }
+        if (isset($options['paging_handler'])) {
+            $entry->add(
+                'supportedControl',
+                Control::OID_PAGING
+            );
         }
         if (isset($options['vendor_version'])) {
             $entry->set('vendorVersion', $options['vendor_version']);
@@ -58,8 +86,8 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
         $request = $message->getRequest();
         $this->filterEntryAttributes($request, $entry);
 
-        if ($dispatcher instanceof RootDseHandlerInterface) {
-            $entry = $dispatcher->rootDse(
+        if ($this->rootDseHandler) {
+            $entry = $this->rootDseHandler->rootDse(
                 new RequestContext($message->controls(), $token),
                 $request,
                 $entry
@@ -83,7 +111,7 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
      */
     protected function filterEntryAttributes(SearchRequest $request, Entry $entry): void
     {
-        if (\count($request->getAttributes()) !== 0) {
+        if (count($request->getAttributes()) !== 0) {
             foreach ($entry->getAttributes() as $dseAttr) {
                 $found = false;
                 foreach ($request->getAttributes() as $attribute) {

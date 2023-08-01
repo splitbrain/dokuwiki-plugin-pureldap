@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -29,7 +30,9 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
 class ServerBindHandler extends BaseServerHandler implements BindHandlerInterface
 {
     /**
-     * {@inheritDoc}
+     * @inheritDoc
+     * @throws RuntimeException
+     * @throws OperationException
      */
     public function handleBind(LdapMessageRequest $message, RequestHandlerInterface $dispatcher, ServerQueue $queue, array $options): TokenInterface
     {
@@ -50,6 +53,7 @@ class ServerBindHandler extends BaseServerHandler implements BindHandlerInterfac
     }
 
     /**
+     * @return BindToken
      * @throws OperationException
      */
     protected function simpleBind(RequestHandlerInterface $dispatcher, SimpleBindRequest $request): TokenInterface

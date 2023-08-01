@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -10,8 +11,12 @@
 
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Entry\Entries;
+use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
@@ -20,6 +25,7 @@ use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
+use FreeDSx\Socket\Exception\ConnectionException;
 
 /**
  * Logic for handling search operations.
@@ -29,7 +35,12 @@ use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 class ClientSearchHandler extends ClientBasicHandler
 {
     /**
-     * {@inheritDoc}
+     * @param ClientProtocolContext $context
+     * @return LdapMessageResponse|null
+     * @throws EncoderException
+     * @throws ProtocolException
+     * @throws UnsolicitedNotificationException
+     * @throws ConnectionException
      */
     public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse
     {
@@ -43,7 +54,16 @@ class ClientSearchHandler extends ClientBasicHandler
     }
 
     /**
-     * {@inheritDoc}
+     * @param LdapMessageRequest $messageTo
+     * @param LdapMessageResponse $messageFrom
+     * @param ClientQueue $queue
+     * @param array $options
+     * @return LdapMessageResponse|null
+     * @throws OperationException
+     * @throws BindException
+     * @throws ProtocolException
+     * @throws UnsolicitedNotificationException
+     * @throws ConnectionException
      */
     public function handleResponse(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom, ClientQueue $queue, array $options): ?LdapMessageResponse
     {

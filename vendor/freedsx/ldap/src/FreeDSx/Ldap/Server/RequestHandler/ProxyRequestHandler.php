@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -44,7 +45,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
     protected $options = [];
 
     /**
-     * {@inheritdoc}
+     * @inheritDoc
      */
     public function bind(string $username, string $password): bool
     {
@@ -56,7 +57,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @inheritDoc
      */
     public function modify(RequestContext $context, ModifyRequest $modify): void
     {
@@ -64,7 +65,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @inheritDoc
      */
     public function modifyDn(RequestContext $context, ModifyDnRequest $modifyDn): void
     {
@@ -72,7 +73,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @inheritDoc
      */
     public function delete(RequestContext $context, DeleteRequest $delete): void
     {
@@ -80,7 +81,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @inheritDoc
      */
     public function add(RequestContext $context, AddRequest $add): void
     {
@@ -88,7 +89,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @inheritDoc
      */
     public function search(RequestContext $context, SearchRequest $search): Entries
     {
@@ -96,7 +97,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @inheritDoc
      */
     public function compare(RequestContext $context, CompareRequest $compare): bool
     {
@@ -109,7 +110,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @inheritDoc
      */
     public function extended(RequestContext $context, ExtendedRequest $extended): void
     {

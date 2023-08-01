@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -10,6 +11,8 @@
 
 namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
+use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\Request\AnonBindRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
@@ -26,7 +29,14 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
 class ServerAnonBindHandler extends ServerBindHandler
 {
     /**
-     * {@inheritDoc}
+     * @param LdapMessageRequest $message
+     * @param RequestHandlerInterface $dispatcher
+     * @param ServerQueue $queue
+     * @param array $options
+     * @return AnonToken
+     * @throws EncoderException
+     * @throws OperationException
+     * @throws RuntimeException
      */
     public function handleBind(LdapMessageRequest $message, RequestHandlerInterface $dispatcher, ServerQueue $queue, array $options): TokenInterface
     {

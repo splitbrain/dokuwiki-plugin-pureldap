@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -11,6 +12,8 @@
 namespace FreeDSx\Ldap\Control;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\BooleanType;
 use FreeDSx\Asn1\Type\OctetStringType;
@@ -18,6 +21,7 @@ use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
+use function count;
 
 /**
  * Represents a control. RFC 4511, 4.1.11
@@ -146,7 +150,8 @@ class Control implements ProtocolElementInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @return AbstractType
+     * @throws EncoderException
      */
     public function toAsn1(): AbstractType
     {
@@ -179,7 +184,8 @@ class Control implements ProtocolElementInterface
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return static|ProtocolElementInterface
      */
     public static function fromAsn1(AbstractType $type)
     {
@@ -196,12 +202,12 @@ class Control implements ProtocolElementInterface
     /**
      * @param Control $control
      * @param AbstractType $type
-     * @return Control
+     * @return self
      * @throws ProtocolException
      */
     protected static function mergeControlData(Control $control, AbstractType $type)
     {
-        if (!($type instanceof SequenceType && \count($type->getChildren()) <= 3)) {
+        if (!($type instanceof SequenceType && count($type->getChildren()) <= 3)) {
             throw new ProtocolException(sprintf(
                 'The received control is malformed. Expected at least 3 sequence values. Received %s.',
                 count($type->getChildren())
@@ -216,6 +222,8 @@ class Control implements ProtocolElementInterface
      * @param AbstractType $type
      * @return AbstractType
      * @throws ProtocolException
+     * @throws EncoderException
+     * @throws PartialPduException
      */
     protected static function decodeEncodedValue(AbstractType $type)
     {

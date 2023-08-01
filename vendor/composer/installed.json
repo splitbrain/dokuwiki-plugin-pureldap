@@ -2,31 +2,34 @@
     "packages": [
         {
             "name": "freedsx/asn1",
-            "version": "0.4.4",
-            "version_normalized": "0.4.4.0",
+            "version": "0.4.7",
+            "version_normalized": "0.4.7.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/FreeDSx/ASN1.git",
-                "reference": "639dc827bfd2750b90972d05dccd1c303f91de39"
+                "reference": "aea7159cb82f6567143db4ba6fd119e8f791c3fb"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/FreeDSx/ASN1/zipball/639dc827bfd2750b90972d05dccd1c303f91de39",
-                "reference": "639dc827bfd2750b90972d05dccd1c303f91de39",
+                "url": "https://api.github.com/repos/FreeDSx/ASN1/zipball/aea7159cb82f6567143db4ba6fd119e8f791c3fb",
+                "reference": "aea7159cb82f6567143db4ba6fd119e8f791c3fb",
                 "shasum": ""
             },
             "require": {
                 "php": ">=7.1"
             },
             "require-dev": {
-                "friends-of-phpspec/phpspec-code-coverage": "^4.3",
-                "phpspec/phpspec": "^5.1|^6.1",
-                "phpstan/phpstan": "^0.11.15"
+                "friends-of-phpspec/phpspec-code-coverage": "^4.3|^6.1",
+                "phpspec/phpspec": "^5.1|^6.1|^7.1",
+                "phpstan/phpstan": "^0.11.15|^0.12",
+                "slevomat/coding-standard": "~7.0",
+                "squizlabs/php_codesniffer": "3.*",
+                "symplify/easy-coding-standard": "^6.1|^7.3|^9.0"
             },
             "suggest": {
                 "ext-gmp": "For big integer support in Integer/Enumerated/OID types and tag numbers."
             },
-            "time": "2020-10-04T18:16:17+00:00",
+            "time": "2023-06-06T16:47:22+00:00",
             "type": "library",
             "installation-source": "dist",
             "autoload": {
@@ -55,43 +58,47 @@
             ],
             "support": {
                 "issues": "https://github.com/FreeDSx/ASN1/issues",
-                "source": "https://github.com/FreeDSx/ASN1/tree/0.4.4"
+                "source": "https://github.com/FreeDSx/ASN1/tree/0.4.7"
             },
             "install-path": "../freedsx/asn1"
         },
         {
             "name": "freedsx/ldap",
-            "version": "0.6.0",
-            "version_normalized": "0.6.0.0",
+            "version": "0.8.0",
+            "version_normalized": "0.8.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/FreeDSx/LDAP.git",
-                "reference": "3d20f4071e73f7471d752e28a035249cae3e68d8"
+                "reference": "98cf7abe6762cd8062bde6f0bbd9bd8364e7d52a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/FreeDSx/LDAP/zipball/3d20f4071e73f7471d752e28a035249cae3e68d8",
-                "reference": "3d20f4071e73f7471d752e28a035249cae3e68d8",
+                "url": "https://api.github.com/repos/FreeDSx/LDAP/zipball/98cf7abe6762cd8062bde6f0bbd9bd8364e7d52a",
+                "reference": "98cf7abe6762cd8062bde6f0bbd9bd8364e7d52a",
                 "shasum": ""
             },
             "require": {
                 "freedsx/asn1": "^0.4.0",
                 "freedsx/sasl": "^0.1.0",
-                "freedsx/socket": "^0.4.0",
-                "php": ">=7.1"
+                "freedsx/socket": "^0.5.2",
+                "php": ">=7.1",
+                "psr/log": "^1|^2|^3"
             },
             "require-dev": {
-                "friends-of-phpspec/phpspec-code-coverage": "^4.3",
-                "phpspec/phpspec": "^5.1|^6.1",
-                "phpstan/phpstan": "^0.11.15",
-                "phpstan/phpstan-strict-rules": "^0.11.1",
-                "phpunit/phpunit": "^8.0|^7.0",
-                "symplify/easy-coding-standard": "^6.1"
+                "friends-of-phpspec/phpspec-code-coverage": "^4.3|^6.1|dev-master",
+                "phpspec/phpspec": "^7.2|^7.1|^6.1|^5.1",
+                "phpstan/phpstan": "^0.12.70",
+                "phpunit/phpunit": "^9.3|^8.0|^7.0",
+                "slevomat/coding-standard": "~7.0",
+                "squizlabs/php_codesniffer": "3.*",
+                "symfony/process": "^3.0|^4.0|^5.0",
+                "symplify/easy-coding-standard": "^6.1|^7.3|^9.0"
             },
             "suggest": {
-                "ext-openssl": "For SSL/TLS support and some SASL mechanisms."
+                "ext-openssl": "For SSL/TLS support and some SASL mechanisms.",
+                "ext-pcntl": "For LDAP server functionality."
             },
-            "time": "2019-12-14T18:46:53+00:00",
+            "time": "2022-05-21T19:17:54+00:00",
             "type": "library",
             "installation-source": "dist",
             "autoload": {
@@ -112,8 +119,14 @@
             "description": "A Pure PHP LDAP library",
             "homepage": "https://github.com/FreeDSx/LDAP",
             "keywords": [
-                "ldap"
+                "activedirectory",
+                "ldap",
+                "openldap"
             ],
+            "support": {
+                "issues": "https://github.com/FreeDSx/LDAP/issues",
+                "source": "https://github.com/FreeDSx/LDAP/tree/0.8.0"
+            },
             "install-path": "../freedsx/ldap"
         },
         {
@@ -171,17 +184,17 @@
         },
         {
             "name": "freedsx/socket",
-            "version": "0.4.0",
-            "version_normalized": "0.4.0.0",
+            "version": "0.5.2",
+            "version_normalized": "0.5.2.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/FreeDSx/Socket.git",
-                "reference": "b517b61900c8cbb7b07a38338998c2c3682cdee8"
+                "reference": "3a4949f39d87fe70a0fc838d47aaf0bf8c900c3e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/FreeDSx/Socket/zipball/b517b61900c8cbb7b07a38338998c2c3682cdee8",
-                "reference": "b517b61900c8cbb7b07a38338998c2c3682cdee8",
+                "url": "https://api.github.com/repos/FreeDSx/Socket/zipball/3a4949f39d87fe70a0fc838d47aaf0bf8c900c3e",
+                "reference": "3a4949f39d87fe70a0fc838d47aaf0bf8c900c3e",
                 "shasum": ""
             },
             "require": {
@@ -189,16 +202,15 @@
             },
             "require-dev": {
                 "freedsx/asn1": "^0.4.0",
-                "friends-of-phpspec/phpspec-code-coverage": "^4.3",
-                "phpspec/phpspec": "^5.1|^6.1",
-                "phpstan/phpstan": "^0.11.15",
-                "phpstan/phpstan-strict-rules": "^0.11.1"
+                "friends-of-phpspec/phpspec-code-coverage": "^4.3|^6.1",
+                "phpspec/phpspec": "^5.1|^6.1|^7.1",
+                "phpstan/phpstan": "^0.12"
             },
             "suggest": {
                 "ext-openssl": "For SSL/TLS support.",
                 "freedsx/asn1": "For ASN.1 based message queues."
             },
-            "time": "2019-12-14T17:31:33+00:00",
+            "time": "2021-12-31T22:39:06+00:00",
             "type": "library",
             "installation-source": "dist",
             "autoload": {
@@ -223,7 +235,64 @@
                 "tcp",
                 "udp"
             ],
+            "support": {
+                "issues": "https://github.com/FreeDSx/Socket/issues",
+                "source": "https://github.com/FreeDSx/Socket/tree/0.5.2"
+            },
             "install-path": "../freedsx/socket"
+        },
+        {
+            "name": "psr/log",
+            "version": "1.1.4",
+            "version_normalized": "1.1.4.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/php-fig/log.git",
+                "reference": "d49695b909c3b7628b6289db5479a1c204601f11"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/php-fig/log/zipball/d49695b909c3b7628b6289db5479a1c204601f11",
+                "reference": "d49695b909c3b7628b6289db5479a1c204601f11",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=5.3.0"
+            },
+            "time": "2021-05-03T11:20:27+00:00",
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-master": "1.1.x-dev"
+                }
+            },
+            "installation-source": "dist",
+            "autoload": {
+                "psr-4": {
+                    "Psr\\Log\\": "Psr/Log/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "PHP-FIG",
+                    "homepage": "https://www.php-fig.org/"
+                }
+            ],
+            "description": "Common interface for logging libraries",
+            "homepage": "https://github.com/php-fig/log",
+            "keywords": [
+                "log",
+                "psr",
+                "psr-3"
+            ],
+            "support": {
+                "source": "https://github.com/php-fig/log/tree/1.1.4"
+            },
+            "install-path": "../psr/log"
         }
     ],
     "dev": true,

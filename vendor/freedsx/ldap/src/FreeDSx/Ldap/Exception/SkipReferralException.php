@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -10,11 +11,13 @@
 
 namespace FreeDSx\Ldap\Exception;
 
+use Exception;
+
 /**
  * Thrown in the referral chaser to indicate that a referral should be skipped.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class SkipReferralException extends \Exception
+class SkipReferralException extends Exception
 {
 }

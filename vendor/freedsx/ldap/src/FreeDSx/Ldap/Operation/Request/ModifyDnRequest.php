@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -13,11 +14,14 @@ namespace FreeDSx\Ldap\Operation\Request;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\BooleanType;
+use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
+use function count;
 
 /**
  * A Modify DN Request. RFC 4511, 4.9
@@ -148,11 +152,12 @@ class ModifyDnRequest implements RequestInterface, DnRequestInterface
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return self
      */
     public static function fromAsn1(AbstractType $type)
     {
-        if (!($type instanceof SequenceType && \count($type) >= 3 && \count($type) <= 4)) {
+        if (!($type instanceof SequenceType && count($type) >= 3 && count($type) <= 4)) {
             throw new ProtocolException('The modify dn request is malformed');
         }
         $entry = $type->getChild(0);
@@ -166,16 +171,16 @@ class ModifyDnRequest implements RequestInterface, DnRequestInterface
         if ($newSuperior !== null && !($newSuperior->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $newSuperior->getTagNumber() === 0)) {
             throw new ProtocolException('The modify dn request is malformed');
         }
-        if ($newSuperior !== null && !$newSuperior instanceof OctetStringType) {
-            throw new ProtocolException('The modify dn request is malformed');
-        }
+        $newSuperior = ($newSuperior instanceof IncompleteType)
+            ? (new LdapEncoder())->complete($newSuperior, AbstractType::TAG_TYPE_OCTET_STRING)
+            : $newSuperior;
         $newSuperior = ($newSuperior !== null) ? $newSuperior->getValue() : null;
 
         return new self($entry->getValue(), $newRdn->getValue(), $deleteOldRdn->getValue(), $newSuperior);
     }
 
     /**
-     * {@inheritdoc}
+     * @return SequenceType
      */
     public function toAsn1(): AbstractType
     {

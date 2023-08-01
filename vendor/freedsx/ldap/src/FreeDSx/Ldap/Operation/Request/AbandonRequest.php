@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -59,7 +60,8 @@ class AbandonRequest implements RequestInterface
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return AbandonRequest
      */
     public static function fromAsn1(AbstractType $type)
     {

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -10,17 +11,25 @@
 
 namespace FreeDSx\Ldap\Protocol;
 
+use Exception;
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\Factory\ServerBindHandlerFactory;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
+use FreeDSx\Ldap\Server\HandlerFactoryInterface;
+use FreeDSx\Ldap\Server\RequestHistory;
+use FreeDSx\Ldap\LoggerTrait;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use FreeDSx\Socket\Exception\ConnectionException;
+use Throwable;
+use function array_merge;
+use function in_array;
 
 /**
  * Handles server-client specific protocol interactions.
@@ -29,6 +38,8 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  */
 class ServerProtocolHandler
 {
+    use LoggerTrait;
+
     /**
      * @var array
      */
@@ -53,9 +64,9 @@ class ServerProtocolHandler
     protected $messageIds = [];
 
     /**
-     * @var RequestHandlerInterface
+     * @var HandlerFactoryInterface
      */
-    protected $dispatcher;
+    protected $handlerFactory;
 
     /**
      * @var ServerAuthorization
@@ -77,9 +88,14 @@ class ServerProtocolHandler
      */
     protected $bindHandlerFactory;
 
+    /**
+     * @var array<string, mixed>
+     */
+    protected $defaultContext = [];
+
     public function __construct(
         ServerQueue $queue,
-        RequestHandlerInterface $dispatcher,
+        HandlerFactoryInterface $handlerFactory,
         array $options = [],
         ServerProtocolHandlerFactory $protocolHandlerFactory = null,
         ServerBindHandlerFactory $bindHandlerFactory = null,
@@ -87,19 +103,27 @@ class ServerProtocolHandler
         ResponseFactory $responseFactory = null
     ) {
         $this->queue = $queue;
-        $this->dispatcher = $dispatcher;
-        $this->options = \array_merge($this->options, $options);
+        $this->handlerFactory = $handlerFactory;
+        $this->options = array_merge($this->options, $options);
         $this->authorizer = $authorizer ?? new ServerAuthorization(null, $this->options);
-        $this->protocolHandlerFactory = $protocolHandlerFactory ?? new ServerProtocolHandlerFactory();
+        $this->protocolHandlerFactory = $protocolHandlerFactory ?? new ServerProtocolHandlerFactory(
+            $handlerFactory,
+            new RequestHistory()
+        );
         $this->bindHandlerFactory = $bindHandlerFactory ?? new ServerBindHandlerFactory();
         $this->responseFactory = $responseFactory ?? new ResponseFactory();
     }
 
     /**
      * Listens for messages from the socket and handles the responses/actions needed.
+     *
+     * @throws EncoderException
      */
-    public function handle(): void
+    public function handle(array $defaultContext = []): void
     {
+        $message = null;
+        $this->defaultContext = $defaultContext;
+
         try {
             while ($message = $this->queue->getMessage()) {
                 $this->dispatchRequest($message);
@@ -111,18 +135,35 @@ class ServerProtocolHandler
         } catch (OperationException $e) {
             # OperationExceptions may be thrown by any handler and will be sent back to the client as the response
             # specific error code and message associated with the exception.
-            if (isset($message)) {
-                $this->queue->sendMessage($this->responseFactory->getStandardResponse(
-                    $message,
-                    $e->getCode(),
-                    $e->getMessage()
-                ));
-            }
+            $this->queue->sendMessage($this->responseFactory->getStandardResponse(
+                $message,
+                $e->getCode(),
+                $e->getMessage()
+            ));
+        } catch (ConnectionException $e) {
+            $this->logInfo(
+                'Ending LDAP client due to client connection issues.',
+                array_merge(
+                    ['message' => $e->getMessage()],
+                    $this->defaultContext
+                )
+            );
         } catch (EncoderException | ProtocolException $e) {
             # Per RFC 4511, 4.1.1 if the PDU cannot be parsed or is otherwise malformed a disconnect should be sent with a
             # result code of protocol error.
             $this->sendNoticeOfDisconnect('The message encoding is malformed.');
-        } catch (\Exception | \Throwable $e) {
+            $this->logError(
+                'The client sent a malformed request. Terminating their connection.',
+                $this->defaultContext
+            );
+        } catch (Exception | Throwable $e) {
+            $this->logError(
+                'An unexpected exception was caught while handling the client. Terminating their connection.',
+                array_merge(
+                    $this->defaultContext,
+                    ['exception' => $e]
+                )
+            );
             if ($this->queue->isConnected()) {
                 $this->sendNoticeOfDisconnect();
             }
@@ -134,10 +175,31 @@ class ServerProtocolHandler
     }
 
     /**
+     * Used asynchronously to end a client session when the server process is shutting down.
+     *
+     * @throws EncoderException
+     */
+    public function shutdown(array $context = []): void
+    {
+        $this->sendNoticeOfDisconnect(
+            'The server is shutting down.',
+            ResultCode::UNAVAILABLE
+        );
+        $this->queue->close();
+        $this->logInfo(
+            'Sent notice of disconnect to client and closed the connection.',
+            $context
+        );
+    }
+
+    /**
      * Routes requests from the message queue based off the current authorization state and what protocol handler the
      * request is mapped to.
      *
      * @throws OperationException
+     * @throws EncoderException
+     * @throws RuntimeException
+     * @throws ConnectionException
      */
     protected function dispatchRequest(LdapMessageRequest $message): void
     {
@@ -154,14 +216,17 @@ class ServerProtocolHandler
             return;
         }
         $request = $message->getRequest();
-        $handler = $this->protocolHandlerFactory->get($request);
+        $handler = $this->protocolHandlerFactory->get(
+            $request,
+            $message->controls()
+        );
 
         # They are authenticated or authentication is not required, so pass the request along...
         if ($this->authorizer->isAuthenticated() || !$this->authorizer->isAuthenticationRequired($request)) {
             $handler->handleRequest(
                 $message,
                 $this->authorizer->getToken(),
-                $this->dispatcher,
+                $this->handlerFactory->makeRequestHandler(),
                 $this->queue,
                 $this->options
             );
@@ -177,6 +242,9 @@ class ServerProtocolHandler
 
     /**
      * Checks that the message ID is valid. It cannot be zero or a message ID that was already used.
+     *
+     * @throws EncoderException
+     * @throws EncoderException
      */
     protected function isValidRequest(LdapMessageRequest $message): bool
     {
@@ -188,7 +256,7 @@ class ServerProtocolHandler
 
             return false;
         }
-        if (\in_array($message->getMessageId(), $this->messageIds, true)) {
+        if (in_array($message->getMessageId(), $this->messageIds, true)) {
             $this->queue->sendMessage($this->responseFactory->getExtendedError(
                 sprintf('The message ID %s is not valid.', $message->getMessageId()),
                 ResultCode::PROTOCOL_ERROR
@@ -204,6 +272,7 @@ class ServerProtocolHandler
      * Sends a bind request to the bind handler and returns the token.
      *
      * @throws OperationException
+     * @throws RuntimeException
      */
     protected function handleAuthRequest(LdapMessageRequest $message): TokenInterface
     {
@@ -216,17 +285,23 @@ class ServerProtocolHandler
 
         return $this->bindHandlerFactory->get($message->getRequest())->handleBind(
             $message,
-            $this->dispatcher,
+            $this->handlerFactory->makeRequestHandler(),
             $this->queue,
             $this->options
         );
     }
 
-    protected function sendNoticeOfDisconnect(string $message = ''): void
-    {
+    /**
+     * @param string $message
+     * @throws EncoderException
+     */
+    protected function sendNoticeOfDisconnect(
+        string $message = '',
+        int $reasonCode = ResultCode::PROTOCOL_ERROR
+    ): void {
         $this->queue->sendMessage($this->responseFactory->getExtendedError(
             $message,
-            ResultCode::PROTOCOL_ERROR,
+            $reasonCode,
             ExtendedResponse::OID_NOTICE_OF_DISCONNECTION
         ));
     }

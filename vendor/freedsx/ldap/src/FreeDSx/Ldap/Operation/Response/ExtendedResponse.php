@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -11,6 +12,8 @@
 namespace FreeDSx\Ldap\Operation\Response;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
@@ -30,6 +33,9 @@ use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
  */
 class ExtendedResponse extends LdapResult
 {
+    /**
+     * @var int
+     */
     protected $tagNumber = 24;
 
     /**
@@ -80,7 +86,9 @@ class ExtendedResponse extends LdapResult
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return self
+     * @throws EncoderException
      */
     public static function fromAsn1(AbstractType $type)
     {
@@ -91,7 +99,9 @@ class ExtendedResponse extends LdapResult
     }
 
     /**
-     * {@inheritdoc}
+     * @return AbstractType
+     * @throws ProtocolException
+     * @throws EncoderException
      */
     public function toAsn1(): AbstractType
     {
@@ -123,7 +133,6 @@ class ExtendedResponse extends LdapResult
     {
         $info = [0 => null, 1 => null];
 
-        /** @var \FreeDSx\Asn1\Type\SequenceType $type */
         foreach ($type->getChildren() as $child) {
             if ($child->getTagNumber() === 10) {
                 $info[0] = $child->getValue();
@@ -138,6 +147,8 @@ class ExtendedResponse extends LdapResult
     /**
      * @param AbstractType $type
      * @return LdapResult
+     * @throws ProtocolException
+     * @throws EncoderException
      */
     protected static function createLdapResult(AbstractType $type)
     {
@@ -150,6 +161,8 @@ class ExtendedResponse extends LdapResult
      * @param AbstractType $type
      * @return AbstractType|null
      * @throws ProtocolException
+     * @throws EncoderException
+     * @throws PartialPduException
      */
     protected static function decodeEncodedValue(AbstractType $type)
     {

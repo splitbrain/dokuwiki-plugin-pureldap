@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -51,6 +52,7 @@ class FilterFactory
 
     /**
      * @throws ProtocolException
+     * @throws RuntimeException
      */
     public static function get(AbstractType $type): FilterInterface
     {
@@ -84,6 +86,7 @@ class FilterFactory
     /**
      * @param int $filterType
      * @param string $filterClass
+     * @throws InvalidArgumentException
      */
     public static function set(int $filterType, string $filterClass): void
     {

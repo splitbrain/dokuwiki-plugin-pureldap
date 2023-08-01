@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -10,12 +11,15 @@
 
 namespace FreeDSx\Ldap\Search\Filter;
 
+use Countable;
+use IteratorAggregate;
+
 /**
  * Represents a logical 'and' filter. RFC 4511, 4.5.1
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class AndFilter implements FilterContainerInterface, \IteratorAggregate, \Countable
+class AndFilter implements FilterContainerInterface, IteratorAggregate, Countable
 {
     use FilterContainerTrait;
 

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -10,11 +11,13 @@
 
 namespace FreeDSx\Ldap\Search;
 
+use Closure;
 use FreeDSx\Ldap\Control\Ad\DirSyncRequestControl;
 use FreeDSx\Ldap\Control\Ad\DirSyncResponseControl;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Entries;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
@@ -100,9 +103,9 @@ class DirSync
      *
      * @param \Closure $handler An anonymous function to pass results to.
      * @param int $checkInterval How often to check for changes (in seconds).
-     * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws OperationException
      */
-    public function watch(\Closure $handler, int $checkInterval = 10): void
+    public function watch(Closure $handler, int $checkInterval = 10): void
     {
         $handler($this->getChanges(), true);
         while ($this->hasChanges()) {
@@ -141,7 +144,7 @@ class DirSync
      * followed with a hasChanges() call to determine if more changes are still available.
      *
      * @return Entries
-     * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws OperationException
      */
     public function getChanges(): Entries
     {
@@ -263,7 +266,7 @@ class DirSync
 
     /**
      * @return SearchRequest
-     * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws OperationException
      */
     protected function getSearchRequest(): SearchRequest
     {
@@ -293,10 +296,10 @@ class DirSync
     }
 
     /**
-     * @return string|null
-     * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @return string
+     * @throws OperationException
      */
-    protected function getDefaultRootNc()
+    protected function getDefaultRootNc(): string
     {
         if ($this->defaultRootNc === null) {
             $this->defaultRootNc = (string) $this->client->readOrFail('', ['defaultNamingContext'])->get('defaultNamingContext');

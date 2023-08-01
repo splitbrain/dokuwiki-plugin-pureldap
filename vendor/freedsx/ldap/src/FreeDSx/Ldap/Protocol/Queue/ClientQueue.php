@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -11,8 +12,12 @@
 namespace FreeDSx\Ldap\Protocol\Queue;
 
 use FreeDSx\Asn1\Encoder\EncoderInterface;
+use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
+use FreeDSx\Ldap\Protocol\LdapMessage;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\LdapQueue;
@@ -67,7 +72,9 @@ class ClientQueue extends LdapQueue
     }
 
     /**
-     * {@inheritDoc}
+     * @param int|null $id
+     * @return \Generator
+     * @throws ConnectionException
      */
     public function getMessages(?int $id = null)
     {
@@ -76,7 +83,13 @@ class ClientQueue extends LdapQueue
         return parent::getMessages($id);
     }
 
-    public function sendMessage(LdapMessageRequest ...$messages): ClientQueue
+    /**
+     * @param LdapMessageRequest ...$messages
+     * @return $this
+     * @throws ConnectionException
+     * @throws EncoderException
+     */
+    public function sendMessage(LdapMessageRequest ...$messages): self
     {
         $this->initSocket();
         $this->sendLdapMessage(...$messages);
@@ -105,7 +118,13 @@ class ClientQueue extends LdapQueue
     }
 
     /**
-     * {@inheritDoc}
+     * @param Message $message
+     * @param int|null $id
+     * @return LdapMessage
+     * @throws ProtocolException
+     * @throws EncoderException
+     * @throws PartialPduException
+     * @throws RuntimeException
      */
     protected function constructMessage(Message $message, ?int $id = null)
     {

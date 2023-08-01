@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -10,6 +11,8 @@
 
 namespace FreeDSx\Ldap\Exception;
 
-class ConnectionException extends \Exception
+use Exception;
+
+class ConnectionException extends Exception
 {
 }

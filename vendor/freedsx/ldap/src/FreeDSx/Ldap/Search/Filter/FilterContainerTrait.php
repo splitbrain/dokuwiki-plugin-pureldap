@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -10,13 +11,17 @@
 
 namespace FreeDSx\Ldap\Search\Filter;
 
+use ArrayIterator;
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\SetType;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
+use Traversable;
 
 /**
  * Methods needed to implement the filter container interface.
@@ -31,7 +36,7 @@ trait FilterContainerTrait
     protected $filters = [];
 
     /**
-     * @param FilterInterface[] ...$filters
+     * @param FilterInterface ...$filters
      */
     public function __construct(FilterInterface ...$filters)
     {
@@ -39,7 +44,7 @@ trait FilterContainerTrait
     }
 
     /**
-     * @param FilterInterface[] ...$filters
+     * @param FilterInterface ...$filters
      * @return $this
      */
     public function add(FilterInterface ...$filters)
@@ -61,7 +66,7 @@ trait FilterContainerTrait
     }
 
     /**
-     * @param FilterInterface[] ...$filters
+     * @param FilterInterface ...$filters
      * @return $this
      */
     public function remove(FilterInterface ...$filters)
@@ -76,7 +81,7 @@ trait FilterContainerTrait
     }
 
     /**
-     * @param FilterInterface[] ...$filters
+     * @param FilterInterface ...$filters
      * @return $this
      */
     public function set(FilterInterface ...$filters)
@@ -122,17 +127,20 @@ trait FilterContainerTrait
     }
 
     /**
-     * @return \ArrayIterator
+     * @inheritDoc
+     * @psalm-return ArrayIterator<array-key, FilterInterface>
+     * @throws RuntimeException
      */
-    public function getIterator()
+    public function getIterator(): Traversable
     {
-        return new \ArrayIterator($this->filters);
+        return new ArrayIterator($this->filters);
     }
 
     /**
-     * @return int
+     * @inheritDoc
+     * @psalm-return 0|positive-int
      */
-    public function count()
+    public function count(): int
     {
         return count($this->filters);
     }
@@ -146,7 +154,11 @@ trait FilterContainerTrait
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @param AbstractType $type
+     * @return self
+     * @throws EncoderException
+     * @throws ProtocolException
      */
     public static function fromAsn1(AbstractType $type)
     {

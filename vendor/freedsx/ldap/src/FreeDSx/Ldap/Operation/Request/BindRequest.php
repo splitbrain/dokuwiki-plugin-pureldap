@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -94,7 +95,8 @@ abstract class BindRequest implements RequestInterface
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return AnonBindRequest|SimpleBindRequest
      */
     public static function fromAsn1(AbstractType $type)
     {

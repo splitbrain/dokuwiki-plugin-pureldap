@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -11,6 +12,8 @@
 namespace FreeDSx\Ldap\Control\Sorting;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\OctetStringType;
@@ -78,7 +81,10 @@ class SortingControl extends Control
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return Control
+     * @throws EncoderException
+     * @throws PartialPduException
      */
     public static function fromAsn1(AbstractType $type)
     {
@@ -88,7 +94,6 @@ class SortingControl extends Control
         }
 
         $sortKeys = [];
-        /** @var SequenceType $response */
         foreach ($response->getChildren() as $sequence) {
             if (!$sequence instanceof SequenceType) {
                 throw new ProtocolException('The sort key is malformed.');

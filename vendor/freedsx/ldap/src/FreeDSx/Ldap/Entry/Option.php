@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -9,6 +10,11 @@
  */
 
 namespace FreeDSx\Ldap\Entry;
+
+use function preg_match;
+use function strlen;
+use function strtolower;
+use function substr;
 
 /**
  * Represents an attribute option. Described in RFC 4512, Section 2.5.2.
@@ -28,7 +34,7 @@ class Option
      * @var string
      */
     protected $lcOption;
-    
+
     /**
      * @param string $option
      */
@@ -57,13 +63,15 @@ class Option
      * A convenience method to get the high value of a range option.
      *
      * @see https://msdn.microsoft.com/en-us/library/cc223242.aspx
+     *
+     * @return null|string
      */
-    public function getHighRange(): string
+    public function getHighRange(): ?string
     {
         if (!$this->isRange()) {
             return '';
         }
-        \preg_match(self::MATCH_RANGE, $this->option, $match);
+        preg_match(self::MATCH_RANGE, $this->option, $match);
 
         return $match[2] ?? null;
     }
@@ -79,7 +87,7 @@ class Option
         if (!$this->isRange()) {
             return null;
         }
-        \preg_match(self::MATCH_RANGE, $this->option, $match);
+        preg_match(self::MATCH_RANGE, $this->option, $match);
 
         return $match[1] ?? null;
     }
@@ -91,11 +99,11 @@ class Option
     public function startsWith(string $option): bool
     {
         if ($this->lcOption === null) {
-            $this->lcOption = \strtolower($this->option);
+            $this->lcOption = strtolower($this->option);
         }
-        $option = \strtolower($option);
-        
-        return \substr($this->lcOption, 0, \strlen($option)) === $option;
+        $option = strtolower($option);
+
+        return substr($this->lcOption, 0, strlen($option)) === $option;
     }
 
     /**
@@ -107,12 +115,12 @@ class Option
     public function equals(Option $option): bool
     {
         if ($this->lcOption === null) {
-            $this->lcOption = \strtolower($this->option);
+            $this->lcOption = strtolower($this->option);
         }
         if ($option->lcOption === null) {
-            $option->lcOption = \strtolower($option->option);
+            $option->lcOption = strtolower($option->option);
         }
-        
+
         return $this->lcOption === $option->lcOption;
     }
 
@@ -124,15 +132,15 @@ class Option
     {
         if ($lowercase) {
             if ($this->lcOption === null) {
-                $this->lcOption = \strtolower($this->option);
+                $this->lcOption = strtolower($this->option);
             }
-            
+
             return $this->lcOption;
         }
-        
+
         return $this->option;
     }
-    
+
     /**
      * @return string
      */

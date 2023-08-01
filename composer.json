@@ -8,7 +8,12 @@
             "email": "andi@splitbrain.org"
         }
     ],
+    "config": {
+        "platform": {
+            "php": "7.4"
+        }
+    },
     "require": {
-        "freedsx/ldap": "^0.6.0"
+        "freedsx/ldap": "^0.8.0"
     }
 }

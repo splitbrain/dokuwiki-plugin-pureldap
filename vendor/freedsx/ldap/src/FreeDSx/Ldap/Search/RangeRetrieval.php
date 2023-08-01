@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -14,6 +15,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Entry\Option;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\LdapClient;
 
@@ -46,21 +48,22 @@ class RangeRetrieval
     public function getRanged(Entry $entry, $attribute): ?Attribute
     {
         $attribute = $attribute instanceof Attribute ? new Attribute($attribute->getName()) : new Attribute($attribute);
-        
+
         foreach ($this->getAllRanged($entry) as $rangedAttribute) {
             if ($rangedAttribute->equals($attribute)) {
                 return $rangedAttribute;
             }
         }
-        
+
         return null;
     }
-    
+
     /**
      * Get all ranged attributes as an array from a entry.
      *
      * @param Entry $entry
      * @return Attribute[]
+     * @psalm-return list<Attribute>
      */
     public function getAllRanged(Entry $entry): array
     {
@@ -105,7 +108,7 @@ class RangeRetrieval
         if (($range = $this->getRangeOption($attribute)) === null) {
             return false;
         }
-        
+
         return $range->getHighRange() !== '*';
     }
 
@@ -117,7 +120,7 @@ class RangeRetrieval
      * @param Attribute $attribute
      * @param string|int $amount
      * @return Attribute
-     * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws OperationException
      */
     public function getMoreValues($entry, Attribute $attribute, $amount = '*'): Attribute
     {
@@ -146,17 +149,17 @@ class RangeRetrieval
                 $result->getDn()->toString()
             ));
         }
-        
+
         return $attrResult;
     }
-    
+
     /**
      * Given a specific entry and attribute, range retrieve all values of the attribute.
      *
      * @param Entry|Dn|string $entry
      * @param string|Attribute $attribute
      * @return Attribute
-     * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws OperationException
      */
     public function getAllValues($entry, $attribute): Attribute
     {
@@ -172,7 +175,7 @@ class RangeRetrieval
                 $entry->getDn()->toString()
             ));
         }
-        
+
         $attrResult->add(...$attribute->getValues());
         while ($this->hasMoreValues($attribute)) {
             $attribute = $this->getMoreValues($entry, $attribute);

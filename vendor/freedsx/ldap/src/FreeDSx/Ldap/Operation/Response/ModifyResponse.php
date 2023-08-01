@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -21,5 +22,8 @@ use FreeDSx\Ldap\Operation\LdapResult;
  */
 class ModifyResponse extends LdapResult
 {
+    /**
+     * @var int
+     */
     protected $tagNumber = 7;
 }

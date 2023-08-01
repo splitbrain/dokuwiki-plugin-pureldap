@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -11,6 +12,7 @@
 namespace FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
  * Methods needed to transform an object to/from ASN1 representation.
@@ -29,6 +31,7 @@ interface ProtocolElementInterface
     /**
      * @param AbstractType $type
      * @return mixed
+     * @throws ProtocolException
      */
     public static function fromAsn1(AbstractType $type);
 }

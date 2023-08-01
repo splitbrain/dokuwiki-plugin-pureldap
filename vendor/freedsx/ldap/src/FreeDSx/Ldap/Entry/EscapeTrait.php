@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -9,6 +10,12 @@
  */
 
 namespace FreeDSx\Ldap\Entry;
+
+use function bin2hex;
+use function implode;
+use function preg_match;
+use function preg_replace_callback;
+use function str_split;
 
 /**
  * Some common methods around escaping attribute values and RDN values.
@@ -29,7 +36,7 @@ trait EscapeTrait
             return $value;
         }
 
-        return '\\' . \implode('\\', \str_split(\bin2hex($value), 2));
+        return '\\' . implode('\\', str_split(bin2hex($value), 2));
     }
 
     /**
@@ -37,13 +44,13 @@ trait EscapeTrait
      */
     protected static function escapeNonPrintable(string $value): string
     {
-        return (string) \preg_replace_callback('/([\x00-\x1F\x7F])/', function ($matches) {
-            return '\\' . \bin2hex($matches[1]);
+        return (string) preg_replace_callback('/([\x00-\x1F\x7F])/', function ($matches) {
+            return '\\' . bin2hex($matches[1]);
         }, $value);
     }
 
     protected static function shouldNotEscape(string $value): bool
     {
-        return (\preg_match('/^(\\\\[0-9A-Fa-f]{2})+$/', $value) === 1 || $value === '');
+        return (preg_match('/^(\\\\[0-9A-Fa-f]{2})+$/', $value) === 1 || $value === '');
     }
 }

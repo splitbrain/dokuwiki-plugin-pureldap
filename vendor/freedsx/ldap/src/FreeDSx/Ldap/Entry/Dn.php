@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -10,15 +11,24 @@
 
 namespace FreeDSx\Ldap\Entry;
 
+use ArrayIterator;
+use Countable;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\UnexpectedValueException;
+use IteratorAggregate;
+use Traversable;
+use function array_slice;
+use function count;
+use function implode;
+use function ltrim;
+use function preg_split;
 
 /**
  * Represents a Distinguished Name.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class Dn implements \IteratorAggregate, \Countable
+class Dn implements IteratorAggregate, Countable
 {
     /**
      * @var string
@@ -40,6 +50,7 @@ class Dn implements \IteratorAggregate, \Countable
 
     /**
      * @return Rdn
+     * @throws UnexpectedValueException
      */
     public function getRdn(): Rdn
     {
@@ -55,25 +66,28 @@ class Dn implements \IteratorAggregate, \Countable
 
     /**
      * @return null|Dn
+     * @throws UnexpectedValueException
      */
     public function getParent(): ?Dn
     {
         if ($this->pieces === null) {
             $this->parse();
         }
-        if (\count((array) $this->pieces) < 2) {
+        if (count((array) $this->pieces) < 2) {
             return null;
         }
 
-        return new Dn(\implode(',', \array_slice((array) $this->pieces, 1)));
+        return new Dn(implode(',', array_slice((array) $this->pieces, 1)));
     }
 
     /**
-     * @return \ArrayIterator
+     * @inheritDoc
+     * @@psalm-return \ArrayIterator<array-key, Rdn>
+     * @throws UnexpectedValueException
      */
-    public function getIterator()
+    public function getIterator(): Traversable
     {
-        return new \ArrayIterator($this->toArray());
+        return new ArrayIterator($this->toArray());
     }
 
     /**
@@ -85,15 +99,17 @@ class Dn implements \IteratorAggregate, \Countable
     }
 
     /**
-     * @return int
+     * @inheritDoc
+     * @psalm-return 0|positive-int
+     * @throws UnexpectedValueException
      */
-    public function count()
+    public function count(): int
     {
         if ($this->pieces === null) {
             $this->parse();
         }
 
-        return \count((array) $this->pieces);
+        return count((array) $this->pieces);
     }
 
     /**
@@ -106,6 +122,7 @@ class Dn implements \IteratorAggregate, \Countable
 
     /**
      * @return Rdn[]
+     * @throws UnexpectedValueException
      */
     public function toArray(): array
     {
@@ -134,6 +151,8 @@ class Dn implements \IteratorAggregate, \Countable
 
     /**
      * @todo This needs proper handling. But the regex would probably be rather crazy.
+     *
+     * @throws UnexpectedValueException
      */
     protected function parse(): void
     {
@@ -142,10 +161,10 @@ class Dn implements \IteratorAggregate, \Countable
 
             return;
         }
-        $pieces = \preg_split('/(?<!\\\\),/', $this->dn);
+        $pieces = preg_split('/(?<!\\\\),/', $this->dn);
         $pieces = ($pieces === false) ? [] : $pieces;
 
-        if (\count($pieces) === 0) {
+        if (count($pieces) === 0) {
             throw new UnexpectedValueException(sprintf(
                 'The DN value "%s" is not valid.',
                 $this->dn
@@ -154,7 +173,7 @@ class Dn implements \IteratorAggregate, \Countable
 
         $rdns = [];
         foreach ($pieces as $i => $piece) {
-            $rdns[$i] = Rdn::create(\ltrim($piece));
+            $rdns[$i] = Rdn::create(ltrim($piece));
         }
 
         $this->pieces = $rdns;

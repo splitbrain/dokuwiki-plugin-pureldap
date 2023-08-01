@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -14,9 +15,10 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Exception\BindException;
+use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
@@ -29,6 +31,7 @@ use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Paging;
 use FreeDSx\Ldap\Search\RangeRetrieval;
 use FreeDSx\Ldap\Search\Vlv;
+use FreeDSx\Sasl\Exception\SaslException;
 
 /**
  * The LDAP client.
@@ -50,6 +53,7 @@ class LdapClient
         'version' => 3,
         'servers' => [],
         'port' => 389,
+        'transport' => 'tcp',
         'base_dn' => null,
         'page_size' => 1000,
         'use_ssl' => false,
@@ -83,8 +87,7 @@ class LdapClient
      * @param string $username
      * @param string $password
      * @return LdapMessageResponse
-     * @throws BindException
-     * @throws OperationException
+     * @throws Exception\BindException
      */
     public function bind(string $username, string $password): LdapMessageResponse
     {
@@ -97,8 +100,9 @@ class LdapClient
      * @param array $options The SASL options (ie. ['username' => '...', 'password' => '...'])
      * @param string $mechanism A specific mechanism to use. If none is supplied, one will be selected.
      * @return LdapMessageResponse
-     * @throws BindException
+     * @throws Exception\BindException
      * @throws OperationException
+     * @throws SaslException
      */
     public function bindSasl(array $options = [], string $mechanism = ''): LdapMessageResponse
     {
@@ -106,9 +110,9 @@ class LdapClient
     }
 
     /**
-     * Check whether or not an entry matches a certain attribute and value.
+     * Check whether an entry matches a certain attribute and value.
      *
-     * @param string|\FreeDSx\Ldap\Entry\Dn $dn
+     * @param string|Dn $dn
      * @param string $attributeName
      * @param string $value
      * @param Control ...$controls
@@ -146,7 +150,7 @@ class LdapClient
      * @param string[] $attributes
      * @param Control ...$controls
      * @return Entry|null
-     * @throws Exception\OperationException
+     * @throws OperationException
      */
     public function read(string $entry = '', $attributes = [], Control ...$controls): ?Entry
     {
@@ -228,7 +232,7 @@ class LdapClient
      * Rename an entry (changing the RDN).
      *
      * @param string|Entry $dn
-     * @param string $newRdn
+     * @param string|Rdn $newRdn
      * @param bool $deleteOldRdn
      * @return LdapMessageResponse
      * @throws OperationException
@@ -243,7 +247,7 @@ class LdapClient
      *
      * @param SearchRequest $request
      * @param Control ...$controls
-     * @return \FreeDSx\Ldap\Entry\Entries
+     * @return Entries
      * @throws OperationException
      */
     public function search(SearchRequest $request, Control ...$controls): Entries
@@ -258,7 +262,7 @@ class LdapClient
      * A helper for performing a paging based search.
      *
      * @param SearchRequest $search
-     * @param int $size
+     * @param null|int $size
      * @return Paging
      */
     public function paging(SearchRequest $search, ?int $size = null): Paging
@@ -298,8 +302,8 @@ class LdapClient
      * @param RequestInterface $request
      * @param Control ...$controls
      * @return LdapMessageResponse|null
+     * @throws Exception\BindException
      * @throws Exception\ConnectionException
-     * @throws Exception\UnsolicitedNotificationException
      * @throws OperationException
      */
     public function send(RequestInterface $request, Control ...$controls): ?LdapMessageResponse
@@ -313,6 +317,8 @@ class LdapClient
      * @param RequestInterface $request
      * @param Control ...$controls
      * @return LdapMessageResponse
+     * @throws Exception\BindException
+     * @throws Exception\ConnectionException
      * @throws OperationException
      */
     public function sendAndReceive(RequestInterface $request, Control ...$controls): LdapMessageResponse
@@ -329,9 +335,10 @@ class LdapClient
      * Issue a startTLS to encrypt the LDAP connection.
      *
      * @return $this
+     * @throws Exception\ConnectionException
      * @throws OperationException
      */
-    public function startTls()
+    public function startTls(): self
     {
         $this->send(Operations::extended(ExtendedRequest::OID_START_TLS));
 
@@ -342,9 +349,10 @@ class LdapClient
      * Unbind and close the LDAP TCP connection.
      *
      * @return $this
+     * @throws Exception\ConnectionException
      * @throws OperationException
      */
-    public function unbind()
+    public function unbind(): self
     {
         $this->send(Operations::unbind());
 
@@ -374,7 +382,7 @@ class LdapClient
     {
         return new RangeRetrieval($this);
     }
-    
+
     /**
      * Access to add/set/remove/reset the controls to be used for each request. If you want request specific controls in
      * addition to these, then pass them as a parameter to the send() method.
@@ -397,14 +405,25 @@ class LdapClient
     }
 
     /**
-     * Merge a set of options.
+     * Merge a set of options. Depending on what you are changing, you many want to set the $forceDisconnect param to
+     * true, which forces the client to disconnect. After which you would have to manually bind again.
      *
-     * @param array $options
+     * @param array $options The set of options to merge in.
+     * @param bool $forceDisconnect Whether the client should disconnect; forcing a manual re-connect / bind. This is
+     *                              false by default.
      * @return $this
      */
-    public function setOptions(array $options)
-    {
-        $this->options = array_merge($this->options, $options);
+    public function setOptions(
+        array $options,
+        bool $forceDisconnect = false
+    ): self {
+        $this->options = array_merge(
+            $this->options,
+            $options
+        );
+        if ($forceDisconnect) {
+            $this->unbindIfConnected();
+        }
 
         return $this;
     }
@@ -413,7 +432,7 @@ class LdapClient
      * @param ClientProtocolHandler|null $handler
      * @return $this
      */
-    public function setProtocolHandler(ClientProtocolHandler $handler = null)
+    public function setProtocolHandler(ClientProtocolHandler $handler = null): self
     {
         $this->handler = $handler;
 
@@ -432,12 +451,13 @@ class LdapClient
 
     /**
      * Try to clean-up if needed.
+     *
+     * @throws Exception\ConnectionException
+     * @throws OperationException
      */
     public function __destruct()
     {
-        if ($this->handler !== null && $this->handler->isConnected()) {
-            $this->unbind();
-        }
+        $this->unbindIfConnected();
     }
 
     protected function handler(): ClientProtocolHandler
@@ -447,5 +467,16 @@ class LdapClient
         }
 
         return $this->handler;
+    }
+
+    /**
+     * @throws Exception\ConnectionException
+     * @throws OperationException
+     */
+    private function unbindIfConnected(): void
+    {
+        if ($this->handler !== null && $this->handler->isConnected()) {
+            $this->unbind();
+        }
     }
 }

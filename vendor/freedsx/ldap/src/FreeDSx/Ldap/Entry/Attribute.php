@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -10,12 +11,27 @@
 
 namespace FreeDSx\Ldap\Entry;
 
+use ArrayIterator;
+use Countable;
+use IteratorAggregate;
+use Traversable;
+use function array_keys;
+use function array_search;
+use function array_shift;
+use function array_values;
+use function count;
+use function explode;
+use function implode;
+use function str_replace;
+use function strpos;
+use function strtolower;
+
 /**
  * Represents an entry attribute and any values.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class Attribute implements \IteratorAggregate, \Countable
+class Attribute implements IteratorAggregate, Countable
 {
     use EscapeTrait;
 
@@ -49,7 +65,7 @@ class Attribute implements \IteratorAggregate, \Countable
 
     /**
      * @param string $attribute
-     * @param mixed[]|string[] ...$values
+     * @param mixed|string ...$values
      */
     public function __construct(string $attribute, ...$values)
     {
@@ -60,7 +76,7 @@ class Attribute implements \IteratorAggregate, \Countable
     /**
      * Add a value, or values, to the attribute.
      *
-     * @param mixed[]|string[] ...$values
+     * @param mixed|string ...$values
      * @return $this
      */
     public function add(...$values): self
@@ -80,19 +96,19 @@ class Attribute implements \IteratorAggregate, \Countable
      */
     public function has($value): bool
     {
-        return \array_search($value, $this->values, true) !== false;
+        return array_search($value, $this->values, true) !== false;
     }
 
     /**
      * Remove a specific value, or values, from an attribute.
      *
-     * @param mixed[]|string[] ...$values
+     * @param mixed|string ...$values
      * @return $this
      */
     public function remove(...$values): self
     {
         foreach ($values as $value) {
-            if (($i = \array_search($value, $this->values, true)) !== false) {
+            if (($i = array_search($value, $this->values, true)) !== false) {
                 unset($this->values[$i]);
             }
         }
@@ -115,7 +131,7 @@ class Attribute implements \IteratorAggregate, \Countable
     /**
      * Set the values for the attribute.
      *
-     * @param mixed[]|string[] ...$values
+     * @param mixed|string ...$values
      * @return $this
      */
     public function set(...$values): self
@@ -201,9 +217,9 @@ class Attribute implements \IteratorAggregate, \Countable
     /**
      * {@inheritDoc}
      */
-    public function getIterator(): \ArrayIterator
+    public function getIterator(): Traversable
     {
-        return new \ArrayIterator($this->values);
+        return new ArrayIterator($this->values);
     }
 
     /**
@@ -211,7 +227,7 @@ class Attribute implements \IteratorAggregate, \Countable
      */
     public function count(): int
     {
-        return \count($this->values);
+        return count($this->values);
     }
 
     /**
@@ -224,10 +240,10 @@ class Attribute implements \IteratorAggregate, \Countable
         $this->options();
         $attribute->options();
         if ($this->lcAttribute === null) {
-            $this->lcAttribute = \strtolower($this->attribute);
+            $this->lcAttribute = strtolower($this->attribute);
         }
         if ($attribute->lcAttribute === null) {
-            $attribute->lcAttribute = \strtolower($attribute->attribute);
+            $attribute->lcAttribute = strtolower($attribute->attribute);
         }
         $nameMatches = ($this->lcAttribute === $attribute->lcAttribute);
 
@@ -245,7 +261,7 @@ class Attribute implements \IteratorAggregate, \Countable
      */
     public function __toString(): string
     {
-        return \implode(', ', $this->values);
+        return implode(', ', $this->values);
     }
 
     /**
@@ -259,7 +275,7 @@ class Attribute implements \IteratorAggregate, \Countable
         if (self::shouldNotEscape($value)) {
             return $value;
         }
-        $value = \str_replace(\array_keys(self::ESCAPE_MAP), \array_values(self::ESCAPE_MAP), $value);
+        $value = str_replace(array_keys(self::ESCAPE_MAP), array_values(self::ESCAPE_MAP), $value);
 
         return self::escapeNonPrintable($value);
     }
@@ -272,13 +288,13 @@ class Attribute implements \IteratorAggregate, \Countable
         if ($this->options !== null) {
             return $this->options;
         }
-        if (\strpos($this->attribute, ';') === false) {
+        if (strpos($this->attribute, ';') === false) {
             $this->options = new Options();
-            
+
             return $this->options;
         }
-        $options = \explode(';', $this->attribute);
-        $this->attribute = (string) \array_shift($options);
+        $options = explode(';', $this->attribute);
+        $this->attribute = (string) array_shift($options);
         $this->options = new Options(...$options);
 
         return $this->options;

@@ -51,7 +51,7 @@ class BitStringType extends AbstractType
      *
      * @return int
      */
-    public function toInteger() : int
+    public function toInteger(): int
     {
         return hexdec(bin2hex(rtrim($this->toBinary(), "\x00")));
     }
@@ -108,7 +108,7 @@ class BitStringType extends AbstractType
 
         if ($num === 1 && strlen($pieces[0]) !== 8) {
             $pieces[0] = str_pad($pieces[0], 8, '0', STR_PAD_LEFT);
-        } elseif ($num > 0 && strlen($pieces[$num - 1]) !== 8) {
+        } elseif ($num !== 0 && strlen($pieces[$num - 1]) !== 8) {
             $pieces[$num - 1] = str_pad($pieces[$num - 1], 8, '0', STR_PAD_RIGHT);
         }
 

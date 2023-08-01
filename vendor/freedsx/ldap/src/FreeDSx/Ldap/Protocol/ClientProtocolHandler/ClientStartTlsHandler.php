@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -25,7 +26,13 @@ use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 class ClientStartTlsHandler implements ResponseHandlerInterface
 {
     /**
-     * {@inheritDoc}
+     * @param LdapMessageRequest $messageTo
+     * @param LdapMessageResponse $messageFrom
+     * @param ClientQueue $queue
+     * @param array $options
+     * @return LdapMessageResponse
+     * @throws ConnectionException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function handleResponse(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom, ClientQueue $queue, array $options): ?LdapMessageResponse
     {

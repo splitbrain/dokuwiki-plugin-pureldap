@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -57,7 +58,8 @@ class SearchResultEntry implements ResponseInterface
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return self
      */
     public static function fromAsn1(AbstractType $type)
     {
@@ -71,9 +73,9 @@ class SearchResultEntry implements ResponseInterface
         if ($partialAttributes !== null) {
             foreach ($partialAttributes as $partialAttribute) {
                 $values = [];
+                /** @var SequenceType|null $attrValues */
                 $attrValues = $partialAttribute->getChild(1);
                 if ($attrValues !== null) {
-                    /** @var SequenceType $attrValues */
                     foreach ($attrValues->getChildren() as $attrValue) {
                         /** @var OctetStringType $attrValue */
                         $values[] = $attrValue->getValue();
@@ -91,7 +93,7 @@ class SearchResultEntry implements ResponseInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @return SequenceType
      */
     public function toAsn1(): AbstractType
     {

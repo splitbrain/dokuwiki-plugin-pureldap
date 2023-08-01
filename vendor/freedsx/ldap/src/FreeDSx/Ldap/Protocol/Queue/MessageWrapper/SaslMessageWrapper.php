@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -43,7 +44,7 @@ class SaslMessageWrapper implements MessageWrapperInterface
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function wrap(string $message): string
     {
@@ -53,7 +54,7 @@ class SaslMessageWrapper implements MessageWrapperInterface
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function unwrap(string $message): Buffer
     {

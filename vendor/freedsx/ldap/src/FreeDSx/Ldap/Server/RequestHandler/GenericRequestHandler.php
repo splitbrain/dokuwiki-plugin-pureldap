@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -38,7 +39,7 @@ class GenericRequestHandler implements RequestHandlerInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @return false
      */
     public function bind(string $username, string $password): bool
     {

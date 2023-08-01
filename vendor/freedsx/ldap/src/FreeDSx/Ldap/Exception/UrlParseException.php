@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -10,11 +11,13 @@
 
 namespace FreeDSx\Ldap\Exception;
 
+use Exception;
+
 /**
  * Represents a parse issue with a LDAP URL.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class UrlParseException extends \Exception
+class UrlParseException extends Exception
 {
 }

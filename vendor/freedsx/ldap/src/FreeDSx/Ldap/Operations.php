@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -16,6 +17,7 @@ use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Entry\Rdn;
+use FreeDSx\Ldap\Exception\UnexpectedValueException;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Operation\Request\AnonBindRequest;
@@ -145,6 +147,8 @@ class Operations
 
     /**
      * Move an LDAP entry to a new parent DN location.
+     *
+     * @throws UnexpectedValueException
      */
     public static function move(string $dn, string $newParentDn): ModifyDnRequest
     {
@@ -182,7 +186,7 @@ class Operations
     /**
      * Search LDAP with a given filter, scope, etc to retrieve a set of entries.
      *
-     * @param string[]|Attribute[] ...$attributes
+     * @param string|Attribute ...$attributes
      */
     public static function search(FilterInterface $filter, ...$attributes): SearchRequest
     {
@@ -193,7 +197,7 @@ class Operations
      * Search for a specific base DN object to read. This sets a 'present' filter for the 'objectClass' attribute to help
      * simplify it.
      *
-     * @param array ...$attributes
+     * @param string|Attribute ...$attributes
      */
     public static function read(string $baseDn, ...$attributes): SearchRequest
     {
@@ -203,7 +207,7 @@ class Operations
     /**
      * Search a single level list from a base DN object.
      *
-     * @param array ...$attributes
+     * @param string|Attribute ...$attributes
      */
     public static function list(FilterInterface $filter, string $baseDn, ...$attributes): SearchRequest
     {

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -15,6 +16,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use FreeDSx\Socket\Exception\ConnectionException;
 
 /**
  * Handles request specific protocol communication details.
@@ -28,6 +30,7 @@ interface ServerProtocolHandlerInterface
      * Handle protocol actions specific to the request received.
      *
      * @throws OperationException
+     * @throws ConnectionException
      */
     public function handleRequest(LdapMessageRequest $message, TokenInterface $token, RequestHandlerInterface $dispatcher, ServerQueue $queue, array $options): void;
 }

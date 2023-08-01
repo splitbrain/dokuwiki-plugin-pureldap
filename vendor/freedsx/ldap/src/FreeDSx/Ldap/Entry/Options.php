@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -10,12 +11,19 @@
 
 namespace FreeDSx\Ldap\Entry;
 
+use ArrayIterator;
+use Countable;
+use IteratorAggregate;
+use Traversable;
+use function count;
+use function sort;
+
 /**
  * Represents a collection of attribute options.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class Options implements \Countable, \IteratorAggregate
+class Options implements Countable, IteratorAggregate
 {
     /**
      * @var Option[]
@@ -129,7 +137,7 @@ class Options implements \Countable, \IteratorAggregate
     {
         $opts = $this->options;
         if ($sortedlc) {
-            \sort($opts);
+            sort($opts);
         }
 
         $options = '';
@@ -141,13 +149,14 @@ class Options implements \Countable, \IteratorAggregate
     }
 
     /**
-     * @return array
+     * @return Option[]
+     * @psalm-return array<array-key, Option>
      */
     public function toArray(): array
     {
         return $this->options;
     }
-    
+
     /**
      * @return string
      */
@@ -157,18 +166,20 @@ class Options implements \Countable, \IteratorAggregate
     }
 
     /**
-     * @return \Traversable
+     * @inheritDoc
+     * @psalm-return ArrayIterator<array-key, Option>
      */
-    public function getIterator()
+    public function getIterator(): Traversable
     {
-        return new \ArrayIterator($this->options);
+        return new ArrayIterator($this->options);
     }
 
     /**
-     * @return int
+     * @inheritDoc
+     * @psalm-return 0|positive-int
      */
-    public function count()
+    public function count(): int
     {
-        return \count($this->options);
+        return count($this->options);
     }
 }

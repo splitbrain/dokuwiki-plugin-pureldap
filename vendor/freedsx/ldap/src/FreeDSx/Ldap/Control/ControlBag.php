@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -10,14 +11,20 @@
 
 namespace FreeDSx\Ldap\Control;
 
-use FreeDSx\Ldap\Exception\UnexpectedValueException;
+use ArrayIterator;
+use Countable;
+use IteratorAggregate;
+use Traversable;
+use function array_search;
+use function count;
+use function is_string;
 
 /**
  * Represents a set of controls.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class ControlBag implements \IteratorAggregate, \Countable
+class ControlBag implements IteratorAggregate, Countable
 {
     /**
      * @var Control[]
@@ -51,7 +58,7 @@ class ControlBag implements \IteratorAggregate, \Countable
             return false;
         }
 
-        return \array_search($control, $this->controls, true) !== false;
+        return array_search($control, $this->controls, true) !== false;
     }
 
     /**
@@ -102,20 +109,21 @@ class ControlBag implements \IteratorAggregate, \Countable
     /**
      * Remove controls by OID or Control object (strict check).
      *
-     * @param Control[]|string[] ...$controls
+     * @param Control|string ...$controls
      * @return $this
      */
     public function remove(...$controls)
     {
+        /** @var Control|string $control */
         foreach ($controls as $control) {
-            if (\is_string($control)) {
+            if (is_string($control)) {
                 foreach ($this->controls as $i => $ctrl) {
                     if ($ctrl->getTypeOid() === $control) {
                         unset($this->controls[$i]);
                     }
                 }
             } else {
-                if (($i = \array_search($control, $this->controls, true)) !== false) {
+                if (($i = array_search($control, $this->controls, true)) !== false) {
                     unset($this->controls[$i]);
                 }
             }
@@ -147,18 +155,19 @@ class ControlBag implements \IteratorAggregate, \Countable
     }
 
     /**
-     * @return int
+     * @inheritDoc
      */
-    public function count()
+    public function count(): int
     {
-        return \count($this->controls);
+        return count($this->controls);
     }
 
     /**
-     * @return \ArrayIterator
+     * @inheritDoc
+     * @psalm-return \ArrayIterator<array-key, Control>
      */
-    public function getIterator()
+    public function getIterator(): Traversable
     {
-        return new \ArrayIterator($this->controls);
+        return new ArrayIterator($this->controls);
     }
 }

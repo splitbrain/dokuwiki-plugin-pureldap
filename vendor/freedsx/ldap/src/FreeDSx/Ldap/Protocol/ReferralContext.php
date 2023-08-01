@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -10,14 +11,17 @@
 
 namespace FreeDSx\Ldap\Protocol;
 
+use Countable;
 use FreeDSx\Ldap\LdapUrl;
+use function count;
+use function strtolower;
 
 /**
  * Keeps track of referrals while they are being chased.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class ReferralContext
+class ReferralContext implements Countable
 {
     /**
      * @var LdapUrl[]
@@ -58,7 +62,7 @@ class ReferralContext
     public function hasReferral(LdapUrl $url): bool
     {
         foreach ($this->referrals as $referral) {
-            if (\strtolower($referral->toString()) === \strtolower($url->toString())) {
+            if (strtolower($referral->toString()) === strtolower($url->toString())) {
                 return true;
             }
         }
@@ -67,10 +71,11 @@ class ReferralContext
     }
 
     /**
-     * @return int
+     * @inheritDoc
+     * @psalm-return 0|positive-int
      */
-    public function count()
+    public function count(): int
     {
-        return \count($this->referrals);
+        return count($this->referrals);
     }
 }

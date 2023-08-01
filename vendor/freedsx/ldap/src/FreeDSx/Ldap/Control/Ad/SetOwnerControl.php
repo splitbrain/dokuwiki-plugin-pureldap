@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -11,6 +12,8 @@
 namespace FreeDSx\Ldap\Control\Ad;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Ldap\Control\Control;
@@ -70,7 +73,10 @@ class SetOwnerControl extends Control
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return Control
+     * @throws EncoderException
+     * @throws PartialPduException
      */
     public static function fromAsn1(AbstractType $type)
     {
