@@ -6,7 +6,7 @@ namespace dokuwiki\plugin\pureldap\test;
  * @group plugin_pureldap
  * @group plugins
  */
-class authTest extends \DokuWikiTest {
+class AuthTest extends \DokuWikiTest {
 
     public function setUp(): void
     {
@@ -24,13 +24,13 @@ class authTest extends \DokuWikiTest {
         $conf['plugin']['pureldap']['validate'] = 'self';
     }
 
-    public function test_ADlogin() {
+    public function testADlogin() {
         $auth = new \auth_plugin_pureldap();
         $this->assertTrue($auth->checkPass('a.legrand', 'Foo_b_ar123!'));
         $this->assertFalse($auth->checkPass('a.legrand', 'wrong password'));
     }
 
-    public function test_ADloginSSO() {
+    public function testADloginSSO() {
         global $conf;
         $conf['plugin']['pureldap']['sso'] = 1;
 

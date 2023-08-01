@@ -1,5 +1,7 @@
 <?php
 
+namespace dokuwiki\plugin\pureldap\test;
+
 use dokuwiki\plugin\pureldap\classes\ADClient;
 
 /**
@@ -8,7 +10,7 @@ use dokuwiki\plugin\pureldap\classes\ADClient;
  * @group plugin_pureldap
  * @group plugins
  */
-class adclient_plugin_pureldap_test extends DokuWikiTest
+class ADClientTest extends \DokuWikiTest
 {
     /**
      * Create a client with default settings
@@ -43,7 +45,7 @@ class adclient_plugin_pureldap_test extends DokuWikiTest
     /**
      * Check user fetching
      */
-    public function test_getUser()
+    public function testGetUser()
     {
         $expect = [
             'user' => 'a.legrand',
@@ -76,7 +78,7 @@ class adclient_plugin_pureldap_test extends DokuWikiTest
      * Check recursive groups
      *
      */
-    public function test_getUserRecursiveGroups()
+    public function testGetUserRecursiveGroups()
     {
         // User m.albro is member of 'gamma nested', which is in turn part of 'beta'
         // thus the user should be part of both groups
@@ -95,7 +97,7 @@ class adclient_plugin_pureldap_test extends DokuWikiTest
     /**
      * Check getting all groups
      */
-    public function test_getGroups()
+    public function testGetGroups()
     {
         // to check paging, we set a super small page size
         $client = $this->getClient(['page_size' => 2]);
@@ -111,7 +113,7 @@ class adclient_plugin_pureldap_test extends DokuWikiTest
     /**
      * Check getting filtered groups
      */
-    public function test_getGroupsFiltered()
+    public function testGetGroupsFiltered()
     {
         // to check paging, we set a super small page size
         $client = $this->getClient(['page_size' => 2]);
@@ -121,7 +123,7 @@ class adclient_plugin_pureldap_test extends DokuWikiTest
         $this->assertSame(['alpha'], array_values($groups));
     }
 
-    public function test_getFilteredUsers()
+    public function testGetFilteredUsers()
     {
         // to check paging, we set a super small page size
         $client = $this->getClient(['page_size' => 2]);
@@ -141,7 +143,7 @@ class adclient_plugin_pureldap_test extends DokuWikiTest
         $this->assertArrayHasKey('m.mcnevin', $users, 'This user should be in Gamma Nested');
     }
 
-    public function test_getFilteredUsersRecursiveGroups()
+    public function testGetFilteredUsersRecursiveGroups()
     {
         // User m.albro is member of 'gamma nested', which is in turn part of 'beta'
         // thus the user should be part of both groups
@@ -155,7 +157,7 @@ class adclient_plugin_pureldap_test extends DokuWikiTest
         $this->assertArrayHasKey('m.albro', $users, 'user should be in gamma nested');
     }
 
-    public function test_getDomainUsers()
+    public function testGetDomainUsers()
     {
         $client = $this->getClient();
         $users = $client->getFilteredUsers(['grps' => 'domain users'], ADClient::FILTER_EQUAL);
