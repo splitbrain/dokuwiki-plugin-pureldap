@@ -33,6 +33,12 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
         $this->cando['getUsers'] = true;
         $this->cando['getGroups'] = true;
         $this->cando['logout'] = !$this->client->getConf('sso');
+        if($this->client->getConf('encryption') !== 'none') {
+            // with encryption passwords can be changed
+            // for resetting passwords a privileged user is needed
+            $this->cando['modPass'] = true;
+        }
+
 
         $this->success = true;
     }
@@ -51,9 +57,9 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
             return true;
         }
 
-        // use a separate client from the default one, because this is not a superuser bind
-        $client = new ADClient($this->conf); // FIXME decide class on config
-        return $client->authenticate($user, $pass);
+        // try to bind with the user credentials, client will stay authenticated as user
+        $this->client = new ADClient($this->conf); // FIXME decide class on config
+        return $this->client->authenticate($user, $pass);
     }
 
     /** @inheritDoc */
@@ -106,4 +112,21 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
     {
         return true;
     }
+
+    /**
+     * Support password changing
+     * @inheritDoc
+     */
+    public function modifyUser($user, $changes)
+    {
+        if (empty($changes['pass'])) {
+            $this->client->error('Only password changes are supported', __FILE__, __LINE__);
+            return false;
+        }
+
+        global $INPUT;
+        return $this->client->setPassword($user, $changes['pass'], $INPUT->str('oldpass', null, true));
+    }
+
+
 }

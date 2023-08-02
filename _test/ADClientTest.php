@@ -30,10 +30,10 @@ class ADClientTest extends \DokuWikiTest
                     'base_dn' => 'DC=example,DC=local',
                     'suffix' => 'example.local',
                     'servers' => ['localhost'],
-                    'port' => 7636,
+                    'port' => 7389, // SSL: 7636
                     'admin_username' => 'vagrant',
                     'admin_password' => 'vagrant',
-                    'encryption' => 'ssl',
+                    'encryption' => 'tls',
                     'validate' => 'self',
                     'attributes' => ['mobile'],
                 ],
@@ -165,6 +165,26 @@ class ADClientTest extends \DokuWikiTest
 
         $users = $client->getFilteredUsers(['grps' => 'domain'], ADClient::FILTER_STARTSWITH);
         $this->assertGreaterThan(250, count($users));
+    }
+
+    public function testSetPassword()
+    {
+        $client = $this->getClient();
+        // password is set as administrator
+        $this->assertTrue($client->setPassword('x.guiu', 'Shibol eTH876?!'), 'Password set as admin');
+
+        // login as user
+        $this->assertTrue($client->authenticate('x.guiu', 'Shibol eTH876?!'), 'Password works');
+
+        // set new pass as user
+        $this->assertTrue($client->setPassword('x.guiu', 'Fully New 1234??', 'Shibol eTH876?!'), 'Password as user');
+
+        // login as user with new password
+        $this->assertTrue($client->authenticate('x.guiu',  'Fully New 1234??'), 'New Password works');
+
+        // use new client for admin connection, and reset password back
+        $client = $this->getClient();
+        $this->assertTrue($client->setPassword('x.guiu', 'Foo_b_ar123!'), 'Password set back as admin');
     }
 
     /**

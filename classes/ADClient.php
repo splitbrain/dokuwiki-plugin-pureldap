@@ -7,7 +7,6 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
 
@@ -24,6 +23,19 @@ class ADClient extends Client
 
     /** @inheritDoc */
     public function getUser($username, $fetchgroups = true)
+    {
+        $entry = $this->getUserEntry($username);
+        if ($entry === null) return null;
+        return $this->entry2User($entry);
+    }
+
+    /**
+     * Get the LDAP entry for the given user
+     *
+     * @param string $username
+     * @return Entry|null
+     */
+    protected function getUserEntry($username)
     {
         if (!$this->autoAuth()) return null;
         $username = $this->simpleUser($username);
@@ -43,8 +55,44 @@ class ADClient extends Client
             return null;
         }
         if ($entries->count() !== 1) return null;
-        $entry = $entries->first();
-        return $this->entry2User($entry);
+        return $entries->first();
+    }
+
+    /** @inheritDoc */
+    public function setPassword($username, $newpass, $oldpass = null)
+    {
+        if (!$this->autoAuth()) return false;
+
+        $entry = $this->getUserEntry($username);
+        if ($entry === null) {
+            $this->error("User '$username' not found", __FILE__, __LINE__);
+            return false;
+        }
+
+        if ($oldpass) {
+            // if an old password is given, this is a self-service password change
+            // this has to be executed as the user themselves, not as the admin
+            if ($this->isAuthenticated !== $this->prepareBindUser($username)) {
+                if (!$this->authenticate($username, $oldpass)) {
+                    $this->error("Old password for '$username' is wrong", __FILE__, __LINE__);
+                    return false;
+                }
+            }
+
+            $entry->remove('unicodePwd', $this->encodePassword($oldpass));
+            $entry->add('unicodePwd', $this->encodePassword($newpass));
+        } else {
+            // run as admin user
+            $entry->set('unicodePwd', $this->encodePassword($newpass));
+        }
+
+        try {
+            $this->ldap->update($entry);
+        } catch (OperationException $e) {
+            $this->fatal($e);
+            return false;
+        }
+        return true;
     }
 
     /** @inheritDoc */
@@ -73,7 +121,7 @@ class ADClient extends Client
         while ($paging->hasEntries()) {
             try {
                 $entries = $paging->getEntries();
-            } catch (ProtocolException $e) {
+            } catch (OperationException $e) {
                 $this->fatal($e);
                 return $groups; // we return what we got so far
             }
@@ -144,13 +192,13 @@ class ADClient extends Client
         while ($paging->hasEntries()) {
             try {
                 $entries = $paging->getEntries();
-            } catch (ProtocolException $e) {
+            } catch (OperationException $e) {
                 $this->fatal($e);
                 break; // we abort and return what we have so far
             }
 
             foreach ($entries as $entry) {
-                $userinfo = $this->entry2User($entry, false);
+                $userinfo = $this->entry2User($entry);
                 $users[$userinfo['user']] = $userinfo;
             }
         }
@@ -174,8 +222,8 @@ class ADClient extends Client
     /** @inheritDoc */
     public function prepareBindUser($user)
     {
-        $user = $this->qualifiedUser($user); // add account suffix
-        return $user;
+        // add account suffix
+        return $this->qualifiedUser($user);
     }
 
     /**
@@ -193,8 +241,10 @@ class ADClient extends Client
     }
 
     /**
-     * @inheritDoc
      * userPrincipalName in the form <user>@<suffix>
+     *
+     * @param string $user
+     * @return string
      */
     protected function qualifiedUser($user)
     {
@@ -207,8 +257,10 @@ class ADClient extends Client
     }
 
     /**
-     * @inheritDoc
      * Removes the account suffix from the given user. Should match the SAMAccountName
+     *
+     * @param string $user
+     * @return string
      */
     protected function simpleUser($user)
     {
@@ -303,5 +355,31 @@ class ADClient extends Client
     {
         list($cn) = explode(',', $dn, 2);
         return $this->cleanGroup(substr($cn, 3));
+    }
+
+    /**
+     * Encode a password for transmission over LDAP
+     *
+     * Passwords are encoded as UTF-16LE strings encapsulated in quotes.
+     *
+     * @param string $password The password to encode
+     * @return string
+     */
+    protected function encodePassword($password)
+    {
+        $password = "\"" . $password . "\"";
+
+        if (function_exists('iconv')) {
+            $adpassword = iconv('UTF-8', 'UTF-16LE', $password);
+        } elseif (function_exists('mb_convert_encoding')) {
+            $adpassword = mb_convert_encoding($password, "UTF-16LE", "UTF-8");
+        } else {
+            // this will only work for ASCII7 passwords
+            $adpassword = '';
+            for ($i = 0; $i < strlen($password); $i++) {
+                $adpassword .= "$password[$i]\000";
+            }
+        }
+        return $adpassword;
     }
 }

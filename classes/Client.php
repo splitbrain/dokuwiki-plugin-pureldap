@@ -2,6 +2,9 @@
 
 namespace dokuwiki\plugin\pureldap\classes;
 
+use dokuwiki\ErrorHandler;
+use dokuwiki\Logger;
+use dokuwiki\Utf8\Clean;
 use dokuwiki\Utf8\PhpString;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Exception\BindException;
@@ -24,7 +27,7 @@ abstract class Client
     /** @var LdapClient */
     protected $ldap;
 
-    /** @var bool is this client authenticated already? */
+    /** @var bool|string is this client authenticated already? Contains username if yes */
     protected $isAuthenticated = false;
 
     /** @var array cached user info */
@@ -93,8 +96,12 @@ abstract class Client
 
         // make sure the right encoding is used
         if ($this->config['sso_charset']) {
-            $user = iconv($this->config['sso_charset'], 'UTF-8', $user);
-        } elseif (!\dokuwiki\Utf8\Clean::isUtf8($user)) {
+            if (function_exists('iconv')) {
+                $user = iconv($this->config['sso_charset'], 'UTF-8', $user);
+            } elseif (function_exists('mb_convert_encoding')) {
+                $user = mb_convert_encoding($user, 'UTF-8', $this->config['sso_charset']);
+            }
+        } elseif (!Clean::isUtf8($user)) {
             $user = utf8_encode($user);
         }
         $user = $this->cleanUser($user);
@@ -120,13 +127,14 @@ abstract class Client
      * @param string $key
      * @return mixed returns null on missing config
      */
-    public function getConf($key) {
-        if(!isset($this->config[$key])) return null;
+    public function getConf($key)
+    {
+        if (!isset($this->config[$key])) return null;
         return $this->config[$key];
     }
 
     /**
-     * Authenticate as admin
+     * Authenticate as admin if not authenticated yet
      */
     public function autoAuth()
     {
@@ -135,7 +143,7 @@ abstract class Client
         $user = $this->prepareBindUser($this->config['admin_username']);
         $ok = $this->authenticate($user, $this->config['admin_password']);
         if (!$ok) {
-            $this->error('Administrative bind failed. Probably wrong user/password.', __FILE__, __LINE__);
+            $this->error('Automatic bind failed. Probably wrong user/password.', __FILE__, __LINE__);
         }
         return $ok;
     }
@@ -151,28 +159,28 @@ abstract class Client
     public function authenticate($user, $pass)
     {
         $user = $this->prepareBindUser($user);
+        $this->isAuthenticated = false;
 
-        if ($this->config['encryption'] === 'tls') {
+        if (!$this->ldap->isConnected() && $this->config['encryption'] === 'tls') {
             try {
                 $this->ldap->startTls();
-            } catch (OperationException $e) {
+            } catch (ConnectionException|OperationException $e) {
                 $this->fatal($e);
+                return false;
             }
         }
 
         try {
             $this->ldap->bind($user, $pass);
         } catch (BindException $e) {
+            $this->debug('Bind failed: ' . $e->getMessage(), $e->getFile(), $e->getLine());
             return false;
-        } catch (ConnectionException $e) {
-            $this->fatal($e);
-            return false;
-        } catch (OperationException $e) {
+        } catch (ConnectionException|OperationException $e) {
             $this->fatal($e);
             return false;
         }
 
-        $this->isAuthenticated = true;
+        $this->isAuthenticated = $user;
         return true;
     }
 
@@ -195,7 +203,7 @@ abstract class Client
         }
 
         // disk cache second
-        if($this->config['usefscache']) {
+        if ($this->config['usefscache']) {
             $cachename = getCacheName($username, '.pureldap-user');
             $cachetime = @filemtime($cachename);
             if ($cachetime && (time() - $cachetime) < $conf['auth_security_timeout']) {
@@ -212,6 +220,7 @@ abstract class Client
         // store in cache
         if ($this->config['usefscache'] && $info !== null) {
             $this->userCache[$username] = $info;
+            /** @noinspection PhpUndefinedVariableInspection We know that cachename is defined */
             file_put_contents($cachename, json_encode($info));
         }
 
@@ -226,6 +235,16 @@ abstract class Client
      * @return null|array
      */
     abstract public function getUser($username, $fetchgroups = true);
+
+    /**
+     * Set a new password for a user
+     *
+     * @param string $username
+     * @param string $newpass
+     * @param string $oldpass Needed for self-service password change in AD
+     * @return bool
+     */
+    abstract public function setPassword($username, $newpass, $oldpass = null);
 
     /**
      * Return a list of all available groups, use cache if available
@@ -324,9 +343,7 @@ abstract class Client
      */
     protected function fatal(\Exception $e)
     {
-        if (class_exists('\dokuwiki\ErrorHandler')) {
-            \dokuwiki\ErrorHandler::logException($e);
-        }
+        ErrorHandler::logException($e);
 
         if (defined('DOKU_UNITTEST')) {
             throw new \RuntimeException('', 0, $e);
@@ -342,11 +359,9 @@ abstract class Client
      * @param string $file
      * @param int $line
      */
-    protected function error($msg, $file, $line)
+    public function error($msg, $file, $line)
     {
-        if (class_exists('\dokuwiki\Logger')) {
-            \dokuwiki\Logger::error('[pureldap] ' . $msg, '', $file, $line);
-        }
+        Logger::error('[pureldap] ' . $msg, '', $file, $line);
 
         if (defined('DOKU_UNITTEST')) {
             throw new \RuntimeException($msg . ' at ' . $file . ':' . $line);
@@ -362,16 +377,14 @@ abstract class Client
      * @param string $file
      * @param int $line
      */
-    protected function debug($msg, $file, $line)
+    public function debug($msg, $file, $line)
     {
         global $conf;
 
-        if (class_exists('\dokuwiki\Logger')) {
-            \dokuwiki\Logger::debug('[pureldap] ' . $msg, '', $file, $line);
-        }
+        Logger::debug('[pureldap] ' . $msg, '', $file, $line);
 
         if ($conf['allowdebug']) {
-            msg('[pureldap] ' . hsc($msg) . ' at ' . $file . ':' . $line, 0);
+            msg('[pureldap] ' . hsc($msg) . ' at ' . $file . ':' . $line);
         }
     }
 }

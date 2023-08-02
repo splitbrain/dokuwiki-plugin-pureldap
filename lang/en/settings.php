@@ -21,7 +21,7 @@ $lang['validate_o_strict'] = 'Strict validation';
 $lang['validate_o_self'] = 'Allow self-signed certificates';
 $lang['validate_o_none'] = 'Accept all certificates (no validation)';
 
-$lang['admin_username'] = 'A privileged user with access to all other user\'s data. Needed for certain actions like sending subscription mails.';
+$lang['admin_username'] = 'A user with access to all other user\'s data. Needed for certain actions like sending subscription mails. Needs additional privileges for password resets.';
 $lang['admin_password'] = 'The password of the above user.';
 
 $lang['attributes'] = 'A comma separated list of additional attributes to fetch for users. May be used by some plugins.';
@@ -31,4 +31,4 @@ $lang['usefscache'] = 'Cache LDAP data on disk to speed up reoccuring queries. C
 $lang['page_size'] = 'The maximum number of results to retrieve from the server in one request. Larger numbers speed up large queries but require more RAM.';
 
 $lang['sso'] = 'Use Single-Sign-On (SSO). This requires the appropriate web server setup.';
-$lang['sso_charset'] = 'If your webserver passes usernames in another charset than UTF-8, configure it here and make sure the iconv extension is available.';
+$lang['sso_charset'] = 'If your webserver passes usernames in another charset than UTF-8, configure it here and make sure the iconv or mbstring extension is available.';
