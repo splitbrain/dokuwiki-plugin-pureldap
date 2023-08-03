@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
     testAD:
         name: PHP ${{ matrix.php-versions }} DokuWiki ${{ matrix.dokuwiki-branch }}
-        runs-on: macos-10.15
+        runs-on: macos-latest
         if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
 
         strategy:
@@ -33,7 +33,7 @@ jobs:
                   cd ..
 
             - name: Checkout
-              uses: actions/checkout@v2
+              uses: actions/checkout@v3
 
             - name: Setup PHP
               uses: shivammathur/setup-php@v2
