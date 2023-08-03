@@ -5,9 +5,4 @@
  * @author Andreas Gohr <andi@splitbrain.org>
  */
 
-// menu entry for admin plugins
-// $lang['menu'] = 'Your menu entry';
-
-// custom language strings for the plugin
-// $lang['fixme'] = 'FIXME';
-
+$lang['pwdexpire'] = 'Your password will expire in less than %d days, you should change it soon.';

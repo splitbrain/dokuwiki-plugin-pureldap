@@ -58,19 +58,25 @@ class ADClientTest extends \DokuWikiTest
                 'gamma nested',
                 'user',
             ],
+            'expires' => false,
             'mobile' => '+63 (483) 526-8809',
         ];
 
         $client = $this->getClient();
         $user = $client->getUser('a.legrand@example.local');
+
+        $this->assertGreaterThan(mktime(0,0,0,6,1,2023), $user['lastpwd'], 'lastpwd should be a timestamp');
+        unset($user['lastpwd']); // we don't know the exact value, so we remove it for the comparison
         $this->assertSame($expect, $user);
 
         // access should work without the domain, too
         $user = $client->getUser('a.legrand');
+        unset($user['lastpwd']);
         $this->assertSame($expect, $user);
 
         // access should be case Insensitive
         $user = $client->getUser('A.LeGrand');
+        unset($user['lastpwd']);
         $this->assertSame($expect, $user);
     }
 
@@ -180,11 +186,22 @@ class ADClientTest extends \DokuWikiTest
         $this->assertTrue($client->setPassword('x.guiu', 'Fully New 1234??', 'Shibol eTH876?!'), 'Password as user');
 
         // login as user with new password
-        $this->assertTrue($client->authenticate('x.guiu',  'Fully New 1234??'), 'New Password works');
+        $this->assertTrue($client->authenticate('x.guiu', 'Fully New 1234??'), 'New Password works');
 
         // use new client for admin connection, and reset password back
         $client = $this->getClient();
         $this->assertTrue($client->setPassword('x.guiu', 'Foo_b_ar123!'), 'Password set back as admin');
+    }
+
+    public function testMaxPasswordAge()
+    {
+        $client = $this->getClient();
+        $maxAge = $client->getMaxPasswordAge(false);
+
+        // convert to days
+        $maxAge = $maxAge / 60 / 60 / 24;
+
+        $this->assertEquals(42, $maxAge, 'Default password age is 42 days');
     }
 
     /**

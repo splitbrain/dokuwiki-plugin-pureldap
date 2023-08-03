@@ -337,6 +337,15 @@ abstract class Client
     }
 
     /**
+     * Get the maximum age a password may have before it needs to be changed
+     *
+     * @return int 0 if no maximum age is set
+     */
+    public function getMaxPasswordAge() {
+        return 0;
+    }
+
+    /**
      * Handle fatal exceptions
      *
      * @param \Exception $e

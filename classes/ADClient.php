@@ -15,6 +15,8 @@ use FreeDSx\Ldap\Search\Filters;
  */
 class ADClient extends Client
 {
+    const ADS_UF_DONT_EXPIRE_PASSWD = 0x10000;
+
     /**
      * @var GroupHierarchyCache
      * @see getGroupHierarchyCache
@@ -286,6 +288,15 @@ class ADClient extends Client
             'grps' => $this->getUserGroups($entry), // we always return groups because its currently inexpensive
         ];
 
+        // handle password expiry info
+        $lastChange = $this->attr2str($entry->get('pwdlastset'));
+        if ($lastChange) {
+            $lastChange = (int)substr($lastChange, 0, -7); // remove last 7 digits (100ns intervals to seconds)
+            $lastChange = $lastChange - 11644473600; // convert from 1601 to 1970 epoch
+        }
+        $user['lastpwd'] = (int)$lastChange;
+        $user['expires'] = !($this->attr2str($entry->get('useraccountcontrol')) & self::ADS_UF_DONT_EXPIRE_PASSWD);
+
         // get additional attributes
         foreach ($this->config['attributes'] as $attr) {
             $user[$attr] = $this->attr2str($entry->get($attr));
@@ -341,8 +352,58 @@ class ADClient extends Client
         $attr[] = new Attribute('Name');
         $attr[] = new Attribute('primaryGroupID');
         $attr[] = new Attribute('memberOf');
+        $attr[] = new Attribute('pwdlastset');
+        $attr[] = new Attribute('useraccountcontrol');
 
         return $attr;
+    }
+
+    /**
+     * Queries the maximum password age from the AD server
+     *
+     * Note: we do not check if passwords actually are set to expire here. This is encoded in the lower 32bit
+     * of the returned 64bit integer (see link below). We do not check this because it would require us to
+     * actually do large integer math and we can simply assume it's enabled when the age check was requested in
+     * DokuWiki configuration.
+     *
+     * @link http://msdn.microsoft.com/en-us/library/ms974598.aspx
+     * @param bool $useCache should a filesystem cache be used if available?
+     * @return int The maximum password age in seconds
+     */
+    public function getMaxPasswordAge($useCache = true)
+    {
+        global $conf;
+        $cachename = getCacheName('maxPwdAge', '.pureldap-maxPwdAge');
+        $cachetime = @filemtime($cachename);
+
+        // valid file system cache? use it
+        if ($useCache && $cachetime && (time() - $cachetime) < $conf['auth_security_timeout']) {
+            return (int)file_get_contents($cachename);
+        }
+
+        if (!$this->autoAuth()) return 0;
+
+        $attr = new Attribute('maxPwdAge');
+        try {
+            $entry = $this->ldap->read(
+                $this->getConf('base_dn'),
+                [$attr]
+            );
+        } catch (OperationException $e) {
+            $this->fatal($e);
+            return 0;
+        }
+        if (!$entry) return 0;
+        $maxPwdAge = $entry->get($attr)->firstValue();
+
+        // MS returns 100 nanosecond intervals, we want seconds
+        // we operate on strings to avoid integer overflow
+        // we also want a positive value, so we trim off the leading minus sign
+        // only then we convert to int
+        $maxPwdAge = (int)ltrim(substr($maxPwdAge, 0, -7), '-');
+
+        file_put_contents($cachename, $maxPwdAge);
+        return $maxPwdAge;
     }
 
     /**

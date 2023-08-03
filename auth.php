@@ -12,7 +12,7 @@ use dokuwiki\plugin\pureldap\classes\Client;
 class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
 {
     /** @var Client */
-    protected $client;
+    public $client;
 
     /**
      * Constructor.
@@ -127,6 +127,5 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
         global $INPUT;
         return $this->client->setPassword($user, $changes['pass'], $INPUT->str('oldpass', null, true));
     }
-
 
 }
