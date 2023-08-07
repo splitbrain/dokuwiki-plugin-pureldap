@@ -1,0 +1,8 @@
+# This is a list of files that were present in previous releases
+# but were removed later. They should not exist in your installation.
+.travis.yml
+PHILOSOPHY.md
+_test/ADClient.test.php
+_test/auth.test.php
+_test/general.test.php
+action.php

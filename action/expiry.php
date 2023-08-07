@@ -11,6 +11,10 @@ class action_plugin_pureldap_expiry extends \dokuwiki\Extension\ActionPlugin
     /** @inheritDoc */
     public function register(Doku_Event_Handler $controller)
     {
+        global $conf;
+        // the plugin might be enabled, but not used
+        if ($conf['authtype'] !== 'authpureldap') return;
+
         $controller->register_hook('DOKUWIKI_STARTED', 'AFTER', $this, 'handlePasswordExpiry');
     }
 
