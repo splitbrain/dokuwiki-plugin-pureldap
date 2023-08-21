@@ -76,7 +76,7 @@ abstract class Client
             $config['ssl_allow_self_signed'] = true;
         }
 
-        $config['suffix'] = PhpString::strtolower($config['suffix']);
+        $config['suffix'] = ltrim(PhpString::strtolower($config['suffix']), '@');
         $config['primarygroup'] = $this->cleanGroup($config['primarygroup']);
 
         return $config;
@@ -173,7 +173,7 @@ abstract class Client
         try {
             $this->ldap->bind($user, $pass);
         } catch (BindException $e) {
-            $this->debug('Bind failed: ' . $e->getMessage(), $e->getFile(), $e->getLine());
+            $this->debug("Bind for $user failed: " . $e->getMessage(), $e->getFile(), $e->getLine());
             return false;
         } catch (ConnectionException|OperationException $e) {
             $this->fatal($e);
