@@ -31,7 +31,7 @@ class GroupHierarchyCache
     {
         $this->ldap = $ldap;
 
-        if($usefs) {
+        if ($usefs) {
             $this->groupHierarchy = $this->getCachedGroupList();
         } else {
             $this->groupHierarchy = $this->getGroupList();
@@ -54,12 +54,12 @@ class GroupHierarchyCache
 
         // valid file system cache? use it
         if ($cachetime && (time() - $cachetime) < $conf['auth_security_timeout']) {
-            return json_decode(file_get_contents($cachename), true);
+            return json_decode(file_get_contents($cachename), true, 512, JSON_THROW_ON_ERROR);
         }
 
         // get fresh data and store in cache
         $groups = $this->getGroupList();
-        file_put_contents($cachename, json_encode($groups));
+        file_put_contents($cachename, json_encode($groups, JSON_THROW_ON_ERROR));
         return $groups;
     }
 
@@ -143,4 +143,3 @@ class GroupHierarchyCache
         return $children;
     }
 }
-

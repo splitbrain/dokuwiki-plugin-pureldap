@@ -12,14 +12,12 @@ use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\LdapClient;
 
-require_once __DIR__ . '/../vendor/autoload.php';
-
 abstract class Client
 {
-    const FILTER_EQUAL = 'equal';
-    const FILTER_CONTAINS = 'contains';
-    const FILTER_STARTSWITH = 'startsWith';
-    const FILTER_ENDSWITH = 'endsWith';
+    public const FILTER_EQUAL = 'equal';
+    public const FILTER_CONTAINS = 'contains';
+    public const FILTER_STARTSWITH = 'startsWith';
+    public const FILTER_ENDSWITH = 'endsWith';
 
     /** @var array the configuration */
     protected $config;
@@ -42,6 +40,8 @@ abstract class Client
      */
     public function __construct($config)
     {
+        require_once __DIR__ . '/../vendor/autoload.php';
+
         $this->config = $this->prepareConfig($config);
         $this->prepareSSO();
         $this->ldap = new LdapClient($this->config);
@@ -164,7 +164,7 @@ abstract class Client
         if (!$this->ldap->isConnected() && $this->config['encryption'] === 'tls') {
             try {
                 $this->ldap->startTls();
-            } catch (ConnectionException|OperationException $e) {
+            } catch (ConnectionException | OperationException $e) {
                 $this->fatal($e);
                 return false;
             }
@@ -175,7 +175,7 @@ abstract class Client
         } catch (BindException $e) {
             $this->debug("Bind for $user failed: " . $e->getMessage(), $e->getFile(), $e->getLine());
             return false;
-        } catch (ConnectionException|OperationException $e) {
+        } catch (ConnectionException | OperationException $e) {
             $this->fatal($e);
             return false;
         }
@@ -207,7 +207,12 @@ abstract class Client
             $cachename = getCacheName($username, '.pureldap-user');
             $cachetime = @filemtime($cachename);
             if ($cachetime && (time() - $cachetime) < $conf['auth_security_timeout']) {
-                $this->userCache[$username] = json_decode(file_get_contents($cachename), true);
+                $this->userCache[$username] = json_decode(
+                    file_get_contents($cachename),
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR
+                );
                 if (!$fetchgroups || is_array($this->userCache[$username]['grps'])) {
                     return $this->userCache[$username];
                 }
@@ -221,7 +226,7 @@ abstract class Client
         if ($this->config['usefscache'] && $info !== null) {
             $this->userCache[$username] = $info;
             /** @noinspection PhpUndefinedVariableInspection We know that cachename is defined */
-            file_put_contents($cachename, json_encode($info));
+            file_put_contents($cachename, json_encode($info, JSON_THROW_ON_ERROR));
         }
 
         return $info;
@@ -341,7 +346,8 @@ abstract class Client
      *
      * @return int 0 if no maximum age is set
      */
-    public function getMaxPasswordAge() {
+    public function getMaxPasswordAge()
+    {
         return 0;
     }
 

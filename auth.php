@@ -1,5 +1,6 @@
 <?php
 
+use dokuwiki\Extension\AuthPlugin;
 use dokuwiki\plugin\pureldap\classes\ADClient;
 use dokuwiki\plugin\pureldap\classes\Client;
 
@@ -9,7 +10,7 @@ use dokuwiki\plugin\pureldap\classes\Client;
  * @license GPL 2 http://www.gnu.org/licenses/gpl-2.0.html
  * @author  Andreas Gohr <andi@splitbrain.org>
  */
-class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
+class auth_plugin_pureldap extends AuthPlugin
 {
     /** @var Client */
     public $client;
@@ -33,7 +34,7 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
         $this->cando['getUsers'] = true;
         $this->cando['getGroups'] = true;
         $this->cando['logout'] = !$this->client->getConf('sso');
-        if($this->client->getConf('encryption') !== 'none') {
+        if ($this->client->getConf('encryption') !== 'none') {
             // with encryption passwords can be changed
             // for resetting passwords a privileged user is needed
             $this->cando['modPass'] = true;
@@ -80,7 +81,8 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
                 Client::FILTER_CONTAINS
             ),
             $start,
-            $limit);
+            $limit
+        );
     }
 
     /** @inheritDoc */
@@ -127,5 +129,4 @@ class auth_plugin_pureldap extends DokuWiki_Auth_Plugin
         global $INPUT;
         return $this->client->setPassword($user, $changes['pass'], $INPUT->str('oldpass', null, true));
     }
-
 }

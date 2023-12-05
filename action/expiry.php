@@ -1,15 +1,19 @@
 <?php
 
+use dokuwiki\Extension\ActionPlugin;
+use dokuwiki\Extension\EventHandler;
+use dokuwiki\Extension\Event;
+
 /**
  * DokuWiki Plugin pureldap (Action Component)
  *
  * @license GPL 2 http://www.gnu.org/licenses/gpl-2.0.html
  * @author  Andreas Gohr <andi@splitbrain.org>
  */
-class action_plugin_pureldap_expiry extends \dokuwiki\Extension\ActionPlugin
+class action_plugin_pureldap_expiry extends ActionPlugin
 {
     /** @inheritDoc */
-    public function register(Doku_Event_Handler $controller)
+    public function register(EventHandler $controller)
     {
         global $conf;
         // the plugin might be enabled, but not used
@@ -24,11 +28,11 @@ class action_plugin_pureldap_expiry extends \dokuwiki\Extension\ActionPlugin
      * On each page load, check if the user's password is about to expire and display a warning if so.
      *
      * @see https://www.dokuwiki.org/devel:events:DOKUWIKI_STARTED
-     * @param Doku_Event $event Event object
+     * @param Event $event Event object
      * @param mixed $param optional parameter passed when event was registered
      * @return void
      */
-    public function handlePasswordExpiry(Doku_Event $event, $param)
+    public function handlePasswordExpiry(Event $event, $param)
     {
         global $auth;
         global $ID;
@@ -62,4 +66,3 @@ class action_plugin_pureldap_expiry extends \dokuwiki\Extension\ActionPlugin
         msg($msg);
     }
 }
-

@@ -15,13 +15,13 @@ use FreeDSx\Ldap\Search\Filters;
  */
 class ADClient extends Client
 {
-    const ADS_UF_DONT_EXPIRE_PASSWD = 0x10000;
+    public const ADS_UF_DONT_EXPIRE_PASSWD = 0x10000;
 
     /**
      * @var GroupHierarchyCache
      * @see getGroupHierarchyCache
      */
-    protected $gch = null;
+    protected $gch;
 
     /** @inheritDoc */
     public function getUser($username, $fetchgroups = true)
@@ -49,7 +49,6 @@ class ADClient extends Client
         $this->debug('Searching ' . $filter->toString(), __FILE__, __LINE__);
 
         try {
-            /** @var Entries $entries */
             $attributes = $this->userAttributes();
             $entries = $this->ldap->search(Operations::search($filter, ...$attributes));
         } catch (OperationException $e) {
@@ -222,7 +221,7 @@ class ADClient extends Client
     }
 
     /** @inheritDoc */
-    public function prepareBindUser($user)
+    protected function prepareBindUser($user)
     {
         // add account suffix
         return $this->qualifiedUser($user);
@@ -292,7 +291,7 @@ class ADClient extends Client
         $lastChange = $this->attr2str($entry->get('pwdlastset'));
         if ($lastChange) {
             $lastChange = (int)substr($lastChange, 0, -7); // remove last 7 digits (100ns intervals to seconds)
-            $lastChange = $lastChange - 11644473600; // convert from 1601 to 1970 epoch
+            $lastChange -= 11_644_473_600; // convert from 1601 to 1970 epoch
         }
         $user['lastpwd'] = (int)$lastChange;
         $user['expires'] = !($this->attr2str($entry->get('useraccountcontrol')) & self::ADS_UF_DONT_EXPIRE_PASSWD);
@@ -414,7 +413,7 @@ class ADClient extends Client
      */
     protected function dn2group($dn)
     {
-        list($cn) = explode(',', $dn, 2);
+        [$cn] = explode(',', $dn, 2);
         return $this->cleanGroup(substr($cn, 3));
     }
 
