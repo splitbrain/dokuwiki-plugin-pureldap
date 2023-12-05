@@ -40,11 +40,16 @@ class ADClient extends Client
     protected function getUserEntry($username)
     {
         if (!$this->autoAuth()) return null;
-        $username = $this->simpleUser($username);
+        $samaccountname = $this->simpleUser($username);
+        $userprincipal = $this->qualifiedUser($username);
 
         $filter = Filters::and(
             Filters::equal('objectClass', 'user'),
-            Filters::equal('sAMAccountName', $this->simpleUser($username))
+            Filters::or(
+                Filters::equal('sAMAccountName', $samaccountname),
+                Filters::equal('userPrincipalName', $userprincipal)
+            )
+
         );
         $this->debug('Searching ' . $filter->toString(), __FILE__, __LINE__);
 
@@ -279,8 +284,12 @@ class ADClient extends Client
      */
     protected function entry2User(Entry $entry)
     {
+        // prefer userPrincipalName over sAMAccountName
+        $user = $this->simpleUser($this->attr2str($entry->get('userPrincipalName')));
+        if($user === '') $user = $this->simpleUser($this->attr2str($entry->get('sAMAccountName')));
+
         $user = [
-            'user' => $this->simpleUser($this->attr2str($entry->get('sAMAccountName'))),
+            'user' => $user,
             'name' => $this->attr2str($entry->get('DisplayName')) ?: $this->attr2str($entry->get('Name')),
             'mail' => $this->attr2str($entry->get('mail')),
             'dn' => $entry->getDn()->toString(),
@@ -348,6 +357,7 @@ class ADClient extends Client
     {
         $attr = parent::userAttributes();
         $attr[] = new Attribute('sAMAccountName');
+        $attr[] = new Attribute('userPrincipalName');
         $attr[] = new Attribute('Name');
         $attr[] = new Attribute('primaryGroupID');
         $attr[] = new Attribute('memberOf');

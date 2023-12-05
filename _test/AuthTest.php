@@ -30,6 +30,18 @@ class AuthTest extends \DokuWikiTest {
         $this->assertFalse($auth->checkPass('a.legrand', 'wrong password'));
     }
 
+    public function testADLongUserLogin()
+    {
+        $auth = new \auth_plugin_pureldap();
+
+        // sam account name
+        $this->assertTrue($auth->checkPass('longlong', 'Foo_b_ar123!'));
+        $this->assertFalse($auth->checkPass('longlong', 'wrong password'));
+
+        $this->assertTrue($auth->checkPass('averylongusernamethatisverylong', 'Foo_b_ar123!'));
+        $this->assertFalse($auth->checkPass('averylongusernamethatisverylong', 'wrong password'));
+    }
+
     public function testADloginSSO() {
         global $conf;
         $conf['plugin']['pureldap']['sso'] = 1;

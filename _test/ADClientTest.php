@@ -80,6 +80,17 @@ class ADClientTest extends \DokuWikiTest
         $this->assertSame($expect, $user);
     }
 
+    public function testGetLongUser()
+    {
+        $client = $this->getClient();
+        $user = $client->getUser('averylongusernamethatisverylong');
+        $this->assertIsArray($user);
+        $this->assertEquals('averylongusernamethatisverylong', $user['user']);
+
+
+    }
+
+
     /**
      * Check recursive groups
      *
