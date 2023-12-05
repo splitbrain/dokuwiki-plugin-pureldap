@@ -1,7 +1,7 @@
 base   pureldap
 author Andreas Gohr
 email  andi@splitbrain.org
-date   2023-08-21
+date   2023-12-05
 name   pureldap plugin
 desc   A new LDAP auth plugin
 url    https://www.dokuwiki.org/plugin:pureldap
