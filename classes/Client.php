@@ -314,7 +314,7 @@ abstract class Client
     protected function attr2str($attribute)
     {
         if ($attribute !== null) {
-            return $attribute->firstValue();
+            return $attribute->firstValue() ?? '';
         }
         return '';
     }
