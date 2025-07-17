@@ -79,7 +79,9 @@ class ADClient extends Client
             // if an old password is given, this is a self-service password change
             // this has to be executed as the user themselves, not as the admin
             if ($this->isAuthenticated !== $this->prepareBindUser($username)) {
-                if (!$this->authenticate($username, $oldpass)) {
+                try {
+                    $this->authenticate($username, $oldpass);
+                } catch (\Exception $e) {
                     $this->error("Old password for '$username' is wrong", __FILE__, __LINE__);
                     return false;
                 }

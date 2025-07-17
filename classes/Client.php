@@ -141,11 +141,13 @@ abstract class Client
         if ($this->isAuthenticated) return true;
 
         $user = $this->prepareBindUser($this->config['admin_username']);
-        $ok = $this->authenticate($user, $this->config['admin_password']);
-        if (!$ok) {
+        try {
+            $this->authenticate($user, $this->config['admin_password']);
+            return true;
+        } catch (\Exception $e) {
             $this->error('Automatic bind failed. Probably wrong user/password.', __FILE__, __LINE__);
         }
-        return $ok;
+        return false;
     }
 
     /**
@@ -153,8 +155,11 @@ abstract class Client
      *
      * @param string $user
      * @param string $pass
-     * @return bool was the authentication successful?
      * @noinspection PhpRedundantCatchClauseInspection
+     * @return true
+     * @throws ConnectionException
+     * @throws OperationException
+     * @throws BindException
      */
     public function authenticate($user, $pass)
     {
@@ -164,9 +169,9 @@ abstract class Client
         if (!$this->ldap->isConnected() && $this->config['encryption'] === 'tls') {
             try {
                 $this->ldap->startTls();
-            } catch (ConnectionException | OperationException $e) {
+            } catch (ConnectionException|OperationException $e) {
                 $this->fatal($e);
-                return false;
+                throw $e;
             }
         }
 
@@ -174,10 +179,10 @@ abstract class Client
             $this->ldap->bind($user, $pass);
         } catch (BindException $e) {
             $this->debug("Bind for $user failed: " . $e->getMessage(), $e->getFile(), $e->getLine());
-            return false;
-        } catch (ConnectionException | OperationException $e) {
+            throw $e;
+        } catch (ConnectionException|OperationException $e) {
             $this->fatal($e);
-            return false;
+            throw $e;
         }
 
         $this->isAuthenticated = $user;

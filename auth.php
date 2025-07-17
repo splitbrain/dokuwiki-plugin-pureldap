@@ -60,7 +60,13 @@ class auth_plugin_pureldap extends AuthPlugin
 
         // try to bind with the user credentials, client will stay authenticated as user
         $this->client = new ADClient($this->conf); // FIXME decide class on config
-        return $this->client->authenticate($user, $pass);
+        try {
+            $this->client->authenticate($user, $pass);
+            return true;
+        } catch (\Exception $e) {
+            $this->parseErrorCodesToMessages($e);
+            return false;
+        }
     }
 
     /** @inheritDoc */
@@ -128,5 +134,47 @@ class auth_plugin_pureldap extends AuthPlugin
 
         global $INPUT;
         return $this->client->setPassword($user, $changes['pass'], $INPUT->str('oldpass', null, true));
+    }
+
+    /**
+     * Parse error codes from LDAP exceptions and output them as user-friendly messages.
+     *
+     * This is currently tailored for Active Directory bind errors.
+     *
+     * @param Exception $e
+     * @return void
+     */
+    public function parseErrorCodesToMessages(\Exception $e)
+    {
+        // See https://ldapwiki.com/wiki/Wiki.jsp?page=Common%20Active%20Directory%20Bind%20Errors
+        $bind_errors = [
+            '52f' => 'ERROR_ACCOUNT_RESTRICTION',
+            '530' => 'ERROR_INVALID_LOGON_HOURS',
+            '531' => 'ERROR_INVALID_WORKSTATION',
+            '532' => 'ERROR_PASSWORD_EXPIRED',
+            '533' => 'ERROR_ACCOUNT_DISABLED',
+            '701' => 'ERROR_ACCOUNT_EXPIRED',
+            '773' => 'ERROR_PASSWORD_MUST_CHANGE',
+        ];
+
+        if (
+            $e instanceof \FreeDSx\Ldap\Exception\BindException &&
+            $e->getCode() === 49 &&
+            preg_match('/ data ([0-9a-f]{3})/', $e->getMessage(), $matches)
+        ) {
+            $code = $matches[1];
+            if (isset($bind_errors[$code])) {
+                $message = $this->getLang($bind_errors[$code]) ?: $bind_errors[$code];
+
+                // on password expired or must change, add reset hint
+                if ($this->canDo('modPass') && ($code == 532 || $code == 773)) {
+                    $link = '<a href="' . wl('start', ['do' => 'resendpwd']) . '" class="pureldap-reset-link">' .
+                        $this->getLang('pass_reset') . '</a>';
+                    $message .= ' ' . $link;
+                }
+
+                msg($message, -1);
+            }
+        }
     }
 }
