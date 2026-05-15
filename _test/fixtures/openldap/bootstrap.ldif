@@ -19,7 +19,7 @@ mail: alice@example.org
 uidNumber: 1001
 gidNumber: 5001
 homeDirectory: /home/alice
-userPassword: {SSHA}5en6G6MezRroT3XKqkdPOmY/BfQ=
+userPassword: {SSHA}IVszbZ6yoe3HJWwInv8FP7QX3KnM7YvmsBS5xQ==
 
 dn: uid=bob,ou=People,dc=example,dc=org
 objectClass: inetOrgPerson
@@ -31,7 +31,7 @@ mail: bob@example.org
 uidNumber: 1002
 gidNumber: 5002
 homeDirectory: /home/bob
-userPassword: {SSHA}5en6G6MezRroT3XKqkdPOmY/BfQ=
+userPassword: {SSHA}IVszbZ6yoe3HJWwInv8FP7QX3KnM7YvmsBS5xQ==
 
 dn: cn=devs,ou=Groups,dc=example,dc=org
 objectClass: posixGroup
