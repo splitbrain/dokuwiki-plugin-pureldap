@@ -137,9 +137,14 @@ def provision_user(first, last, row):
     print(f"  + user {uid}", flush=True)
     create_user(uid, first, last, row)
     patch_user(uid, first, last, row)
+    # Some upstream CSV rows have the same group in multiple columns
+    # (e.g. Trevascus has alpha,alpha,beta). samba-tool addmembers
+    # errors on a duplicate add, so dedupe first.
+    seen = set()
     for col in ("group1", "group2", "group3"):
         group = (row.get(col, "") if row else "").strip()
-        if group:
+        if group and group not in seen:
+            seen.add(group)
             add_user_to_group(uid, group)
 
 

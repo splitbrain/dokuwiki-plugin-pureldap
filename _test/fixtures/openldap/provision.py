@@ -191,9 +191,14 @@ def main():
             print(f"  + user {uid}", flush=True)
             add_user(uid, first, last, row, password_hash, next_uid_number)
             next_uid_number += 1
+            # The upstream CSV has duplicate group entries on some rows
+            # (e.g. Trevascus has alpha,alpha,beta). slapd rejects a
+            # second memberUid: <uid> with err=20, so dedupe first.
+            seen = set()
             for col in ("group1", "group2", "group3"):
                 group = row.get(col, "").strip()
-                if group:
+                if group and group not in seen:
+                    seen.add(group)
                     add_membership(group, uid)
 
     # The hardcoded long-name user — mirrors the ps1's "Very Long".
