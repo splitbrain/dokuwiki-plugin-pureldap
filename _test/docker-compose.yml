@@ -1,17 +1,18 @@
 # Single compose file for both LDAP integration fixtures.
 #
-# tls-init is a one-shot that generates a single self-signed cert
-# covering localhost / 127.0.0.1 / dc1.example.com into a named
-# volume. Both backends consume it: openldap reads it directly; samba
-# can't, because its first-boot provisioning writes its own cert into
-# the same path — so samba mounts the volume read-only at /certs and
-# samba/setup.sh copies it into /var/lib/samba/private/tls after
-# first-boot has finished.
+# tls-init is a one-shot service that generates a self-signed cert
+# (CN=localhost, SAN: localhost/127.0.0.1/dc1.example.com) into a
+# named volume. Both backends consume it: openldap reads it directly
+# from the cert volume mounted at its expected path; samba's first-boot
+# provisioning writes its own cert into /var/lib/samba/private/tls,
+# so samba mounts the volume read-only at /certs and the per-backend
+# setup.sh copies the shared cert into place after first-boot finishes.
 #
-# Both backends use post_start to run a tiny setup.sh followed by a
-# csv-driven provision.py. The scripts touch /tmp/provisioned when
-# done; a healthcheck reads that, so `docker compose up -d --wait`
-# blocks until both backends are fully populated.
+# Provisioning itself is driven by the CI workflow via `docker exec`,
+# not by compose post_start lifecycle hooks. The hook syntax is clean
+# but requires compose v2.30+; the ubuntu-latest runner currently
+# silently misbehaves on it (the previous attempt with post_start
+# failed in ~30s with no logs). docker exec is portable everywhere.
 
 volumes:
   tls-certs:
@@ -52,15 +53,6 @@ services:
     volumes:
       - ./fixtures:/fixtures:ro
       - tls-certs:/container/service/slapd/assets/certs
-    post_start:
-      - command: ["bash",    "/fixtures/openldap/setup.sh"]
-      - command: ["python3", "/fixtures/openldap/provision.py"]
-    healthcheck:
-      test: ["CMD-SHELL", "test -e /tmp/provisioned"]
-      interval: 5s
-      timeout: 5s
-      retries: 60
-      start_period: 30s
 
   samba:
     image: nowsci/samba-domain:latest
@@ -85,15 +77,3 @@ services:
     volumes:
       - ./fixtures:/fixtures:ro
       - tls-certs:/certs:ro
-    post_start:
-      - command: ["bash",    "/fixtures/samba/setup.sh"]
-      - command: ["python3", "/fixtures/samba/provision.py"]
-    healthcheck:
-      # First-boot domain provisioning takes 30-90s before samba-tool
-      # responds, then provision.py creates 300+ users — the deadline
-      # here is wide.
-      test: ["CMD-SHELL", "test -e /tmp/provisioned"]
-      interval: 5s
-      timeout: 5s
-      retries: 120
-      start_period: 60s

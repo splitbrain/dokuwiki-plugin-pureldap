@@ -1,10 +1,11 @@
 name: Integration tests
 
-# 'docker compose up -d --wait' is the entire fixture setup: both LDAP
-# services bring themselves up, run provision.py via their post_start
-# hook, and their healthchecks gate on the sentinel file the script
-# drops when it finishes. By the time --wait returns both backends are
-# populated and phpunit can run.
+# Brings up both LDAP services via docker compose, then drives the
+# per-backend setup + provisioning via docker exec. The scripts handle
+# their own wait-for-ready, so 'up -d' (no --wait) is enough — exec
+# blocks until the script returns and exits non-zero on failure.
+# (Compose's post_start lifecycle hook would be cleaner but requires
+# v2.30+ and silently misbehaves on the ubuntu-latest runner.)
 
 on: [push, pull_request]
 
@@ -45,8 +46,21 @@ jobs:
 
             - name: Bring up fixtures
               run: |
-                docker compose -f _test/docker-compose.yml up -d --wait
+                set -e
+                docker compose -f _test/docker-compose.yml up -d
                 docker compose -f _test/docker-compose.yml ps
+
+            - name: Provision OpenLDAP
+              run: |
+                set -e
+                docker exec pureldap-openldap bash    /fixtures/openldap/setup.sh
+                docker exec pureldap-openldap python3 /fixtures/openldap/provision.py
+
+            - name: Provision Samba AD
+              run: |
+                set -e
+                docker exec pureldap-samba bash    /fixtures/samba/setup.sh
+                docker exec pureldap-samba python3 /fixtures/samba/provision.py
 
             - name: Create DokuWiki environment
               uses: dokuwiki/github-action/.github/actions/dokuenv@main
