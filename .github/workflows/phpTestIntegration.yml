@@ -60,14 +60,14 @@ jobs:
             - name: Provision OpenLDAP
               run: |
                 set -ex
-                docker exec pureldap-openldap bash    /fixtures/openldap/setup.sh
-                docker exec pureldap-openldap python3 /fixtures/openldap/provision.py
+                docker exec pureldap-openldap bash    /fixtures/openldap/setup.sh     2>&1 | tee /tmp/openldap-setup.log
+                docker exec pureldap-openldap python3 /fixtures/openldap/provision.py 2>&1 | tee /tmp/openldap-provision.log
 
             - name: Provision Samba AD
               run: |
                 set -ex
-                docker exec pureldap-samba bash    /fixtures/samba/setup.sh
-                docker exec pureldap-samba python3 /fixtures/samba/provision.py
+                docker exec pureldap-samba bash    /fixtures/samba/setup.sh     2>&1 | tee /tmp/samba-setup.log
+                docker exec pureldap-samba python3 /fixtures/samba/provision.py 2>&1 | tee /tmp/samba-provision.log
 
             - name: Create DokuWiki environment
               uses: dokuwiki/github-action/.github/actions/dokuenv@main
@@ -118,6 +118,18 @@ jobs:
                   docker compose -f _test/docker-compose.yml logs --tail=500
                   echo '```'
                   echo '</details>'
+
+                  for f in openldap-setup openldap-provision samba-setup samba-provision; do
+                    if [ -f "/tmp/${f}.log" ]; then
+                      echo
+                      echo "<details><summary>${f}.log (docker exec output)</summary>"
+                      echo
+                      echo '```'
+                      tail -c 200000 "/tmp/${f}.log"
+                      echo '```'
+                      echo '</details>'
+                    fi
+                  done
                   for c in pureldap-openldap pureldap-samba; do
                     echo
                     echo "<details><summary>inspect $c</summary>"
