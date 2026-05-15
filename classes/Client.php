@@ -180,7 +180,7 @@ abstract class Client
         if (!$this->ldap->isConnected() && $this->config['encryption'] === 'tls') {
             try {
                 $this->ldap->startTls();
-            } catch (ConnectionException|OperationException $e) {
+            } catch (ConnectionException | OperationException $e) {
                 $this->fatal($e);
                 throw $e;
             }
@@ -191,7 +191,7 @@ abstract class Client
         } catch (BindException $e) {
             $this->debug("Bind for $identifier failed: " . $e->getMessage(), $e->getFile(), $e->getLine());
             throw $e;
-        } catch (ConnectionException|OperationException $e) {
+        } catch (ConnectionException | OperationException $e) {
             $this->fatal($e);
             throw $e;
         }
