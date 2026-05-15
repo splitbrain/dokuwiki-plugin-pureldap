@@ -5,16 +5,18 @@
 # unicodePwd, maxPwdAge, userAccountControl) that ADClientTest et al.
 # pass without server-specific tweaks.
 #
+# `docker compose -f _test/docker-compose.samba.yml up -d --wait` is the
+# complete fixture setup: samba starts and self-provisions the domain,
+# the provisioner sidecar waits for samba-tool to respond, applies
+# users.json via docker-exec → samba-tool/ldbmodify (against this very
+# container), and reissues the LDAPS cert with a localhost SAN. The
+# provisioner needs docker socket access for the exec; that's fine for
+# the test environment but obviously not a pattern to copy to prod.
+#
 # Usage:
-#   docker compose -f _test/docker-compose.samba.yml up -d
-#   php _test/fixtures/provision.php --backend samba
+#   docker compose -f _test/docker-compose.samba.yml up -d --wait
 #   php phpunit.phar --group plugin_pureldap _test/ADClientTest.php
 #   docker compose -f _test/docker-compose.samba.yml down -v
-#
-# Data lives in _test/fixtures/users.json and is loaded by provision.php,
-# which docker-execs samba-tool and ldbmodify inside this container. The
-# only in-container artifact is regen-tls.sh, called once at the end of
-# provisioning to reissue the LDAPS cert with a localhost SAN.
 
 services:
   samba:
@@ -40,3 +42,28 @@ services:
       - "7636:636"
     volumes:
       - ./fixtures/samba/regen-tls.sh:/regen-tls.sh:ro
+    healthcheck:
+      # samba-tool only starts responding once domain provisioning has
+      # finished, which takes 30-90s after first boot. The wide timeout
+      # accommodates that.
+      test: ["CMD-SHELL", "samba-tool user list >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 30s
+      retries: 60
+      start_period: 30s
+
+  provisioner:
+    image: php:8.2-cli-alpine
+    depends_on:
+      samba:
+        condition: service_healthy
+    volumes:
+      - ./fixtures:/fixtures:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command:
+      - sh
+      - -c
+      - |
+        apk add --no-cache --quiet docker-cli >/dev/null
+        php /fixtures/provision.php --backend samba
+    restart: "no"

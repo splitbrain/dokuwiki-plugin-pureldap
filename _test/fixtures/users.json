@@ -3,8 +3,8 @@
 
   "domains": {
     "openldap": {
-      "host":      "localhost",
-      "port":      1389,
+      "host":      "openldap",
+      "port":      389,
       "bind_dn":   "cn=admin,dc=example,dc=org",
       "bind_pw":   "adminpass",
       "base":      "dc=example,dc=org",
@@ -14,8 +14,6 @@
     },
     "samba": {
       "container":  "pureldap-samba",
-      "host":       "localhost",
-      "port":       7389,
       "base":       "DC=example,DC=local",
       "users_dn":   "CN=Users,DC=example,DC=local",
       "ldb_path":   "/var/lib/samba/private/sam.ldb",

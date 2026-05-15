@@ -58,16 +58,10 @@ jobs:
                 echo ::add-matcher::${{ runner.tool_cache }}/php.json
                 echo ::add-matcher::${{ runner.tool_cache }}/phpunit.json
 
-            - name: Install ldap-utils
-              run: sudo apt-get update -qq && sudo apt-get install -y -qq ldap-utils
-
             - name: Start ${{ matrix.fixture.label }} fixture
               run: |
-                docker compose -f ${{ matrix.fixture.compose }} up -d
+                docker compose -f ${{ matrix.fixture.compose }} up -d --wait
                 docker compose -f ${{ matrix.fixture.compose }} ps
-
-            - name: Provision fixture
-              run: php _test/fixtures/provision.php --backend ${{ matrix.fixture.name }}
 
             - name: Create DokuWiki environment
               uses: dokuwiki/github-action/.github/actions/dokuenv@main
@@ -94,4 +88,6 @@ jobs:
 
             - name: Dump fixture logs on failure
               if: failure()
-              run: docker logs ${{ matrix.fixture.container }} --tail=300 || true
+              run: |
+                docker compose -f ${{ matrix.fixture.compose }} ps -a
+                docker compose -f ${{ matrix.fixture.compose }} logs --tail=300 || true
