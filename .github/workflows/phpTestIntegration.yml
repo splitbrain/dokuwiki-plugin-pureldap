@@ -18,6 +18,11 @@ jobs:
         name: Integration (PHP ${{ matrix.php-version }}, DokuWiki ${{ matrix.dokuwiki-branch }})
         runs-on: ubuntu-latest
         if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+        # `pull-requests: write` is needed so the failure-dump step can
+        # post the captured output as a PR comment (see end of the steps).
+        permissions:
+            contents: read
+            pull-requests: write
 
         strategy:
             fail-fast: false
@@ -86,17 +91,56 @@ jobs:
 
             - name: Dump fixture logs on failure
               if: failure()
+              env:
+                GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                 set +e
-                echo "==== docker ps -a ===="
-                docker ps -a
-                echo "==== docker compose ps -a ===="
-                docker compose -f _test/docker-compose.yml ps -a
-                echo "==== compose logs ===="
-                docker compose -f _test/docker-compose.yml logs --tail=500 || true
-                for c in pureldap-openldap pureldap-samba; do
-                  echo "==== inspect $c ===="
-                  docker inspect "$c" --format '{{.State.Status}} ({{.State.ExitCode}}) {{.State.Error}}' 2>&1 || true
-                  echo "==== $c: which ldapadd python3 samba-tool slappasswd ===="
-                  docker exec "$c" sh -c 'for b in ldapadd ldapsearch ldapmodify python3 samba-tool slappasswd ldbmodify bash; do echo "  $b: $(command -v "$b" || echo MISSING)"; done' 2>&1 || true
-                done
+                {
+                  echo "## Integration failure dump for ${GITHUB_SHA::7}"
+                  echo
+                  echo '<details><summary>docker ps -a</summary>'
+                  echo
+                  echo '```'
+                  docker ps -a
+                  echo '```'
+                  echo '</details>'
+                  echo
+                  echo '<details><summary>docker compose ps -a</summary>'
+                  echo
+                  echo '```'
+                  docker compose -f _test/docker-compose.yml ps -a
+                  echo '```'
+                  echo '</details>'
+                  echo
+                  echo '<details><summary>docker compose logs</summary>'
+                  echo
+                  echo '```'
+                  docker compose -f _test/docker-compose.yml logs --tail=500
+                  echo '```'
+                  echo '</details>'
+                  for c in pureldap-openldap pureldap-samba; do
+                    echo
+                    echo "<details><summary>inspect $c</summary>"
+                    echo
+                    echo '```'
+                    docker inspect "$c" --format '{{.State.Status}} ({{.State.ExitCode}}) {{.State.Error}}' 2>&1
+                    echo '---'
+                    docker exec "$c" sh -c 'for b in ldapadd ldapsearch ldapmodify python3 samba-tool slappasswd ldbmodify bash apt-get; do echo "  $b: $(command -v "$b" || echo MISSING)"; done' 2>&1
+                    echo '---'
+                    docker exec "$c" sh -c 'cat /etc/os-release 2>/dev/null | head -5' 2>&1
+                    echo '```'
+                    echo '</details>'
+                  done
+                } > /tmp/dump.md
+
+                # Also echo to the workflow log
+                cat /tmp/dump.md
+
+                # And post as a comment on the PR (so the agent driving CI can read it via MCP).
+                # gh CLI is preinstalled on ubuntu-latest runners; uses $GH_TOKEN.
+                PR_NUM=$(gh pr list --state open --head "${GITHUB_REF_NAME}" --json number --jq '.[0].number' --repo "${GITHUB_REPOSITORY}")
+                if [ -n "${PR_NUM}" ]; then
+                  gh pr comment "${PR_NUM}" --repo "${GITHUB_REPOSITORY}" --body-file /tmp/dump.md
+                else
+                  echo "No open PR found for ${GITHUB_REF_NAME}; skipping comment."
+                fi
