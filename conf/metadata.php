@@ -29,3 +29,22 @@ $meta['page_size'] = array('numeric', '_min' => 1);
 
 $meta['sso'] = array('onoff');
 $meta['sso_charset'] = array('string');
+
+$meta['usertree'] = array('string');
+$meta['grouptree'] = array('string');
+$meta['userfilter'] = array('string');
+$meta['groupfilter'] = array('string');
+$meta['userscope'] = array('multichoice', '_choices' => array('sub', 'one', 'base'));
+$meta['groupscope'] = array('multichoice', '_choices' => array('sub', 'one', 'base'));
+$meta['userkey'] = array('string');
+$meta['groupkey'] = array('string');
+$meta['namekey'] = array('string');
+$meta['mailkey'] = array('string');
+$meta['userClass'] = array('string');
+$meta['groupClass'] = array('string');
+$meta['memberof_attr'] = array('string');
+$meta['password_attr'] = array('string');
+$meta['binddn'] = array('string');
+$meta['group_strategy'] = array('multichoice', '_choices' => array('auto', 'grouptree', 'memberof', 'none'));
+$meta['modPass'] = array('onoff');
+$meta['modPassPlain'] = array('onoff');

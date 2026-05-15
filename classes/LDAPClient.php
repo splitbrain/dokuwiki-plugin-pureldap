@@ -6,8 +6,10 @@ use dokuwiki\PassHash;
 use dokuwiki\Utf8\PhpString;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\FilterParseException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\FilterParser;
@@ -47,6 +49,14 @@ class LDAPClient extends Client
             'groupClass' => 'groupOfNames',
             'memberof_attr' => 'memberOf',
             'password_attr' => 'userPassword',
+            'userfilter' => '',
+            'groupfilter' => '',
+            'usertree' => '',
+            'grouptree' => '',
+            'userscope' => 'sub',
+            'groupscope' => 'sub',
+            'binddn' => '',
+            'group_strategy' => 'auto',
             'modPass' => 1,
             'modPassPlain' => 0,
         ];
@@ -56,6 +66,45 @@ class LDAPClient extends Client
             }
         }
         return $config;
+    }
+
+    /**
+     * Authenticate a user.
+     *
+     * When the subclass can produce a bindable identifier from the input
+     * (AD's UPN, or a configured binddn template) we bind directly.
+     * Otherwise we go through the standard search-then-bind dance:
+     * authenticate as the admin, locate the user entry, then bind as
+     * their full DN.
+     *
+     * @inheritDoc
+     */
+    public function authenticate($user, $pass)
+    {
+        if ($this->usesDirectBind()) {
+            return parent::authenticate($user, $pass);
+        }
+
+        if (!$this->autoAuth()) {
+            throw new BindException('Cannot resolve user without admin credentials', 49);
+        }
+        $entry = $this->getUserEntry($user);
+        if ($entry === null) {
+            throw new BindException('User not found: ' . $user, 49);
+        }
+        return $this->bindAs($entry->getDn()->toString(), $pass);
+    }
+
+    /**
+     * Whether the subclass can transform the input username into a
+     * directly-bindable identifier without an LDAP lookup. Drives the
+     * authenticate() flow.
+     *
+     * @return bool
+     */
+    protected function usesDirectBind()
+    {
+        return $this->config['binddn'] !== '';
     }
 
     /** @inheritDoc */
@@ -77,8 +126,12 @@ class LDAPClient extends Client
         $this->debug('Searching ' . $filter->toString(), __FILE__, __LINE__);
 
         try {
-            $attributes = $this->userAttributes();
-            $entries = $this->ldap->search(Operations::search($filter, ...$attributes));
+            $request = $this->applySearchScope(
+                Operations::search($filter, ...$this->userAttributes()),
+                $this->config['usertree'],
+                $this->config['userscope']
+            );
+            $entries = $this->ldap->search($request);
         } catch (OperationException $e) {
             $this->fatal($e);
             return null;
@@ -147,7 +200,11 @@ class LDAPClient extends Client
         }
 
         $this->debug('Searching ' . $filter->toString(), __FILE__, __LINE__);
-        $search = Operations::search($filter, $this->config['groupkey']);
+        $search = $this->applySearchScope(
+            Operations::search($filter, $this->config['groupkey']),
+            $this->config['grouptree'],
+            $this->config['groupscope']
+        );
         $paging = $this->ldap->paging($search);
 
         $groups = [];
@@ -214,8 +271,11 @@ class LDAPClient extends Client
         }
 
         $this->debug('Searching ' . $filter->toString(), __FILE__, __LINE__);
-        $attributes = $this->userAttributes();
-        $search = Operations::search($filter, ...$attributes);
+        $search = $this->applySearchScope(
+            Operations::search($filter, ...$this->userAttributes()),
+            $this->config['usertree'],
+            $this->config['userscope']
+        );
         $paging = $this->ldap->paging($search);
 
         $users = [];
@@ -235,6 +295,48 @@ class LDAPClient extends Client
 
         ksort($users);
         return $users;
+    }
+
+    /**
+     * Apply the configured search base and scope to a SearchRequest.
+     *
+     * @param SearchRequest $request
+     * @param string $base Empty falls back to the bind context
+     * @param string $scope sub|one|base
+     * @return SearchRequest
+     */
+    protected function applySearchScope(SearchRequest $request, $base, $scope)
+    {
+        if ($base !== '') {
+            $request->setBaseDn($base);
+        }
+        switch ($scope) {
+            case 'base':
+                $request->setScope(SearchRequest::SCOPE_BASE_OBJECT);
+                break;
+            case 'one':
+                $request->setScope(SearchRequest::SCOPE_SINGLE_LEVEL);
+                break;
+            case 'sub':
+            default:
+                $request->setScope(SearchRequest::SCOPE_WHOLE_SUBTREE);
+                break;
+        }
+        return $request;
+    }
+
+    /**
+     * When a binddn template is configured, substitute %{user} (and any
+     * other placeholders from userSearchPlaceholders) so the user binds
+     * directly with that DN instead of being looked up first.
+     *
+     * @inheritDoc
+     */
+    protected function prepareBindUser($user)
+    {
+        $template = $this->config['binddn'];
+        if ($template === '') return $user;
+        return FilterTemplate::substitute($template, $this->userSearchPlaceholders($user));
     }
 
     /** @inheritDoc */
@@ -310,6 +412,10 @@ class LDAPClient extends Client
         foreach ($this->splitConfigList('namekey') as $key) $attr[] = new Attribute($key);
         $attr[] = new Attribute($this->config['mailkey']);
         $attr[] = new Attribute($this->config['memberof_attr']);
+        if ($this->config['groupfilter'] !== '') {
+            // grouptree resolution may reference the user's gid in its filter
+            $attr[] = new Attribute('gidNumber');
+        }
         foreach ($this->config['attributes'] as $attribute) {
             $attr[] = new Attribute($attribute);
         }
@@ -343,34 +449,120 @@ class LDAPClient extends Client
     }
 
     /**
-     * Compute the user's group memberships from the configured memberOf
-     * attribute on the user entry. Subclasses may add directory-specific
-     * groups via {@see additionalGroups()}.
+     * Compute the user's group memberships using the configured group
+     * strategy. Subclasses may add directory-specific groups via
+     * {@see additionalGroups()}.
      *
      * @param Entry $userentry
      * @return string[]
      */
     protected function getUserGroups(Entry $userentry)
     {
-        $groups = [];
-        $memberAttr = $this->config['memberof_attr'];
-
-        if ($userentry->has($memberAttr)) {
-            $groupDNs = $userentry->get($memberAttr)->getValues();
-            if ($this->config['recursivegroups']) {
-                $gch = $this->getGroupHierarchyCache();
-                foreach ($groupDNs as $dn) {
-                    $groupDNs = array_merge($groupDNs, $gch->getParents($dn));
-                }
-                $groupDNs = array_unique($groupDNs);
-            }
-            $groups = array_map([$this, 'dn2group'], $groupDNs);
+        switch ($this->resolveGroupStrategy($userentry)) {
+            case 'grouptree':
+                $groups = $this->groupsFromGroupTree($userentry);
+                break;
+            case 'memberof':
+                $groups = $this->groupsFromMemberOf($userentry);
+                break;
+            case 'none':
+            default:
+                $groups = [];
+                break;
         }
 
         $groups[] = $this->config['defaultgroup'];
         $groups = array_merge($groups, $this->additionalGroups($userentry));
 
         sort($groups);
+        return $groups;
+    }
+
+    /**
+     * Resolve `group_strategy=auto` to a concrete strategy based on what
+     * the directory offers; pass other values through unchanged.
+     *
+     * @param Entry $userentry
+     * @return string one of grouptree|memberof|none
+     */
+    protected function resolveGroupStrategy(Entry $userentry)
+    {
+        $strategy = $this->config['group_strategy'] ?? 'auto';
+        if ($strategy !== 'auto') return $strategy;
+
+        if ($this->config['groupfilter'] !== '') return 'grouptree';
+        if ($userentry->has($this->config['memberof_attr'])) return 'memberof';
+        return 'none';
+    }
+
+    /**
+     * Resolve groups by walking the memberOf attribute on the user entry,
+     * with optional recursive expansion through the hierarchy cache.
+     *
+     * @param Entry $userentry
+     * @return string[]
+     */
+    protected function groupsFromMemberOf(Entry $userentry)
+    {
+        $memberAttr = $this->config['memberof_attr'];
+        if (!$userentry->has($memberAttr)) return [];
+
+        $groupDNs = $userentry->get($memberAttr)->getValues();
+        if ($this->config['recursivegroups']) {
+            $gch = $this->getGroupHierarchyCache();
+            foreach ($groupDNs as $dn) {
+                $groupDNs = array_merge($groupDNs, $gch->getParents($dn));
+            }
+            $groupDNs = array_unique($groupDNs);
+        }
+        return array_map([$this, 'dn2group'], $groupDNs);
+    }
+
+    /**
+     * Resolve groups by running a configured groupfilter against the
+     * grouptree (the RFC 2307 / posixGroup pattern). Placeholders
+     * `%{user}`, `%{dn}`, `%{gid}` are available in the template.
+     *
+     * @param Entry $userentry
+     * @return string[]
+     */
+    protected function groupsFromGroupTree(Entry $userentry)
+    {
+        if (!$this->autoAuth()) return [];
+
+        $template = $this->config['groupfilter'];
+        $username = $this->firstNonEmptyAttr($userentry, $this->splitConfigList('userkey'));
+        $placeholders = $this->userSearchPlaceholders($username);
+        $placeholders['dn'] = $userentry->getDn()->toString();
+        $placeholders['gid'] = $this->attr2str($userentry->get('gidNumber'));
+
+        $filterStr = FilterTemplate::substitute($template, $placeholders);
+        try {
+            $filter = FilterParser::parse($filterStr);
+        } catch (FilterParseException $e) {
+            $this->error('Could not parse groupfilter: ' . $filterStr, __FILE__, __LINE__);
+            return [];
+        }
+
+        $search = $this->applySearchScope(
+            Operations::search($filter, $this->config['groupkey']),
+            $this->config['grouptree'],
+            $this->config['groupscope']
+        );
+        $paging = $this->ldap->paging($search);
+
+        $groups = [];
+        while ($paging->hasEntries()) {
+            try {
+                $entries = $paging->getEntries();
+            } catch (OperationException $e) {
+                $this->fatal($e);
+                return $groups;
+            }
+            foreach ($entries as $entry) {
+                $groups[] = $this->cleanGroup($this->attr2str($entry->get($this->config['groupkey'])));
+            }
+        }
         return $groups;
     }
 

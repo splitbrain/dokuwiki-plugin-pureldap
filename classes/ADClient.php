@@ -99,6 +99,22 @@ class ADClient extends LDAPClient
         return $this->qualifiedUser($user);
     }
 
+    /** @inheritDoc */
+    protected function prepareAdminBindUser($admin)
+    {
+        return $this->qualifiedUser($admin);
+    }
+
+    /**
+     * AD always uses UPN/principal-name binding, never search-then-bind.
+     *
+     * @inheritDoc
+     */
+    protected function usesDirectBind()
+    {
+        return true;
+    }
+
     /**
      * AD looks up users by either sAMAccountName (short form) or
      * userPrincipalName (long form with @suffix); the seeded userfilter

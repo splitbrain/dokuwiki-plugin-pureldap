@@ -137,9 +137,9 @@ abstract class Client
     {
         if ($this->isAuthenticated) return true;
 
-        $user = $this->prepareBindUser($this->config['admin_username']);
+        $user = $this->prepareAdminBindUser($this->config['admin_username']);
         try {
-            $this->authenticate($user, $this->config['admin_password']);
+            $this->bindAs($user, $this->config['admin_password']);
             return true;
         } catch (\Exception $e) {
             $this->error('Automatic bind failed. Probably wrong user/password.', __FILE__, __LINE__);
@@ -148,11 +148,10 @@ abstract class Client
     }
 
     /**
-     * Authenticates a given user. This client will remain authenticated
+     * Authenticates a given user. This client will remain authenticated.
      *
      * @param string $user
      * @param string $pass
-     * @noinspection PhpRedundantCatchClauseInspection
      * @return true
      * @throws ConnectionException
      * @throws OperationException
@@ -160,7 +159,22 @@ abstract class Client
      */
     public function authenticate($user, $pass)
     {
-        $user = $this->prepareBindUser($user);
+        return $this->bindAs($this->prepareBindUser($user), $pass);
+    }
+
+    /**
+     * Issue a simple bind with the given identifier (DN, UPN, or whatever
+     * the directory accepts) without further transformation.
+     *
+     * @param string $identifier
+     * @param string $pass
+     * @return true
+     * @throws BindException
+     * @throws ConnectionException
+     * @throws OperationException
+     */
+    protected function bindAs($identifier, $pass)
+    {
         $this->isAuthenticated = false;
 
         if (!$this->ldap->isConnected() && $this->config['encryption'] === 'tls') {
@@ -173,17 +187,29 @@ abstract class Client
         }
 
         try {
-            $this->ldap->bind($user, $pass);
+            $this->ldap->bind($identifier, $pass);
         } catch (BindException $e) {
-            $this->debug("Bind for $user failed: " . $e->getMessage(), $e->getFile(), $e->getLine());
+            $this->debug("Bind for $identifier failed: " . $e->getMessage(), $e->getFile(), $e->getLine());
             throw $e;
         } catch (ConnectionException|OperationException $e) {
             $this->fatal($e);
             throw $e;
         }
 
-        $this->isAuthenticated = $user;
+        $this->isAuthenticated = $identifier;
         return true;
+    }
+
+    /**
+     * How to transform admin_username before binding. Defaults to identity;
+     * Active Directory overrides to apply UPN suffix.
+     *
+     * @param string $admin
+     * @return string
+     */
+    protected function prepareAdminBindUser($admin)
+    {
+        return $admin;
     }
 
     /**

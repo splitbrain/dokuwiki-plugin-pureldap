@@ -29,3 +29,23 @@ $conf['page_size'] = 150;
 
 $conf['sso'] = 0;
 $conf['sso_charset'] = '';
+
+// Generic LDAP options (used when directory_type=ldap)
+$conf['usertree'] = '';
+$conf['grouptree'] = '';
+$conf['userfilter'] = '';
+$conf['groupfilter'] = '';
+$conf['userscope'] = 'sub';
+$conf['groupscope'] = 'sub';
+$conf['userkey'] = 'uid';
+$conf['groupkey'] = 'cn';
+$conf['namekey'] = 'cn';
+$conf['mailkey'] = 'mail';
+$conf['userClass'] = 'inetOrgPerson';
+$conf['groupClass'] = 'groupOfNames';
+$conf['memberof_attr'] = 'memberOf';
+$conf['password_attr'] = 'userPassword';
+$conf['binddn'] = '';
+$conf['group_strategy'] = 'auto';
+$conf['modPass'] = 1;
+$conf['modPassPlain'] = 0;
