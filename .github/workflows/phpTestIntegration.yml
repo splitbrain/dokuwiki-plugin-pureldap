@@ -59,8 +59,14 @@ jobs:
                 echo ::add-matcher::${{ runner.tool_cache }}/phpunit.json
 
             - name: Start ${{ matrix.fixture.label }} fixture
+              # `compose run --rm` is the only invocation that gives a
+              # firm "the provisioner has exited successfully" signal:
+              # it starts dependencies (honouring depends_on service_healthy),
+              # runs the provisioner attached, and returns its exit code.
+              # `compose up --wait` returned too early on one-shot services,
+              # so phpunit was racing against still-provisioning fixtures.
               run: |
-                docker compose -f ${{ matrix.fixture.compose }} up -d --wait
+                docker compose -f ${{ matrix.fixture.compose }} run --rm -T provisioner
                 docker compose -f ${{ matrix.fixture.compose }} ps
 
             - name: Create DokuWiki environment
