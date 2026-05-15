@@ -5,8 +5,12 @@
  * @author Andreas Gohr <andi@splitbrain.org>
  */
 
+$lang['directory_type'] = 'Type of directory to authenticate against. Pick <code>ad</code> for Active Directory; <code>ldap</code> for OpenLDAP / FreeIPA / 389DS / any other RFC 4511 LDAP server.';
+$lang['directory_type_o_ad'] = 'Active Directory';
+$lang['directory_type_o_ldap'] = 'Generic LDAP';
+
 $lang['base_dn'] = 'Your base DN. Eg. <code>DC=my,DC=domain,DC=org</code>';
-$lang['suffix'] = 'Your account suffix. Eg. <code>my.domain.org</code>';
+$lang['suffix'] = '[AD only] Your account suffix. Eg. <code>my.domain.org</code>';
 
 $lang['servers'] = 'Comma-separated list of your LDAP/AD servers. Servers are tried in order until one connects.';
 $lang['port'] = 'LDAP/AD server port. Empty for default port.';
@@ -25,7 +29,7 @@ $lang['admin_username'] = 'A user with access to all other user\'s data. Needed 
 $lang['admin_password'] = 'The password of the above user.';
 
 $lang['attributes'] = 'A comma separated list of additional attributes to fetch for users. May be used by some plugins.';
-$lang['primarygroup'] = 'The name of your users primary group. Usually a localized version of <code>Domain Users</code>, eg. <code>Domänen-Benutzer</code>.';
+$lang['primarygroup'] = '[AD only] The name of your users primary group. Usually a localized version of <code>Domain Users</code>, eg. <code>Domänen-Benutzer</code>.';
 $lang['recursivegroups'] = 'Correctly fetch nested group memberships for users? Increases LDAP requests and load on the AD server.';
 $lang['expirywarn'] = 'Number of days before password expiry to warn the user. Set to 0 to disable.';
 $lang['usefscache'] = 'Cache LDAP data on disk to speed up reoccuring queries. Check the <code>securitytimeout</code> for the maximum cache time.';

@@ -6,6 +6,8 @@
  * @author Andreas Gohr <andi@splitbrain.org>
  */
 
+$conf['directory_type'] = 'ad';
+
 $conf['base_dn'] = '';
 $conf['suffix'] = '';
 

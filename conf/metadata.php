@@ -6,6 +6,8 @@
  * @author Andreas Gohr <andi@splitbrain.org>
  */
 
+$meta['directory_type'] = array('multichoice', '_choices' => array('ad', 'ldap'));
+
 $meta['base_dn'] = array('string');
 $meta['suffix'] = array('string');
 
