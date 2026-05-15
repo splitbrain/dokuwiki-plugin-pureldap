@@ -58,6 +58,14 @@ if (!$force && probeUser($ctx['probe_user'], $backend, $ctx)) {
     exit(0);
 }
 
+if ($backend === 'openldap') {
+    // osixia/openldap creates the dc=… root from env vars but no sub-OUs.
+    // The first user/group add would fail with "no such object" against
+    // an absent parent, so seed the containers we declared in the spec.
+    ensureContainer($ctx['people_ou'], $ctx);
+    ensureContainer($ctx['groups_ou'], $ctx);
+}
+
 if (isset($spec['password_policy'][$backend])) {
     applyPasswordPolicy($spec['password_policy'][$backend], $backend, $ctx);
 }
@@ -224,6 +232,33 @@ function applyPasswordPolicy(array $policy, string $backend, array $ctx): void
 // ---------------------------------------------------------------------------
 // Backend invocation helpers
 // ---------------------------------------------------------------------------
+
+function ensureContainer(string $dn, array $ctx): void
+{
+    if (entryExists($dn, $ctx)) {
+        return;
+    }
+    [$rdnAttr, $rdnValue] = explode('=', explode(',', $dn, 2)[0], 2);
+    echo "  + container {$dn}\n";
+    ldapAdd("dn: {$dn}\nobjectClass: organizationalUnit\n{$rdnAttr}: {$rdnValue}\n", $ctx);
+}
+
+function entryExists(string $dn, array $ctx): bool
+{
+    $proc = proc_open(
+        ['ldapsearch', '-x',
+         '-H', "ldap://{$ctx['host']}:{$ctx['port']}",
+         '-D', $ctx['bind_dn'],
+         '-w', $ctx['bind_pw'],
+         '-b', $dn,
+         '-s', 'base', '-LLL', '(objectClass=*)', 'dn'],
+        [0 => ['file', '/dev/null', 'r'],
+         1 => ['file', '/dev/null', 'w'],
+         2 => ['file', '/dev/null', 'w']],
+        $pipes
+    );
+    return is_resource($proc) && proc_close($proc) === 0;
+}
 
 function ldapAdd(string $ldif, array $ctx): void
 {
