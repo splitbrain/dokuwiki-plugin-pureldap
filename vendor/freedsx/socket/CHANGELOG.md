@@ -1,6 +1,23 @@
 CHANGELOG
 =========
 
+0.6.3 (2026-04-25)
+------------------
+* Lock FreeDSx dependencies to prepare for a 1.0 release. This will be the final 0.x release.
+
+0.6.2 (2026-04-05)
+------------------
+* Allow SocketServer::accept to take a float.
+
+0.6.1 (2023-01-21)
+------------------
+* Slight optimization for Socket::isConnected when not using a unix based socket.
+
+0.6.0 (2023-01-21)
+------------------
+* Fix SSL based option mappings (ssl_crypto_type).
+* Fix how Socket::isConnected is determined. The feof behavior was unreliable in PHP 8.2.
+
 0.5.2 (2021-12-31)
 ------------------
 * Support constructing a socket server from a unix socket.

@@ -10,13 +10,13 @@ jobs:
 
         strategy:
             matrix:
-                php-versions: ['7.4']
+                php-versions: ['8.2']
                 dokuwiki-branch: [ 'master']
             fail-fast: false
 
         steps:
             - name: Cache Vagrant boxes
-              uses: actions/cache@v2
+              uses: actions/cache@v4
               with:
                 path: ~/.vagrant.d/boxes
                 key: ${{ runner.os }}-vagrant-${{ hashFiles('Vagrantfile') }}
@@ -33,7 +33,7 @@ jobs:
                   cd ..
 
             - name: Checkout
-              uses: actions/checkout@v3
+              uses: actions/checkout@v4
 
             - name: Setup PHP
               uses: shivammathur/setup-php@v2

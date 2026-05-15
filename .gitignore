@@ -5,3 +5,4 @@ vendor/freedsx/sasl/tests
 vendor/freedsx/socket/tests
 vendor/**/*.yml
 vendor/**/*.dist
+vendor/freedsx/sasl/docs

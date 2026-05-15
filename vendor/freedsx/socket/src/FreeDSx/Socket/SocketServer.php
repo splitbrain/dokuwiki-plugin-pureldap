@@ -29,14 +29,15 @@ class SocketServer extends Socket
     ];
 
     /**
-     * @var array
+     * @var array<string, mixed>
      */
     protected $serverOpts = [
         'use_ssl' => false,
         'ssl_cert' => null,
         'ssl_cert_key' => null,
         'ssl_cert_passphrase' => null,
-        'ssl_crypto_type' => STREAM_CRYPTO_METHOD_TLSv1_2_SERVER | STREAM_CRYPTO_METHOD_TLSv1_1_SERVER | STREAM_CRYPTO_METHOD_TLS_SERVER,
+        'ssl_ciphers' => 'DEFAULT',
+        'ssl_crypto_method' => STREAM_CRYPTO_METHOD_TLSv1_2_SERVER | STREAM_CRYPTO_METHOD_TLSv1_1_SERVER | STREAM_CRYPTO_METHOD_TLS_SERVER,
         'ssl_validate_cert' => false,
         'idle_timeout' => 600,
     ];
@@ -47,7 +48,7 @@ class SocketServer extends Socket
     protected $clients = [];
 
     /**
-     * @param array $options
+     * @param array<string, mixed> $options
      */
     public function __construct(array $options = [])
     {
@@ -117,11 +118,7 @@ class SocketServer extends Socket
         return $this;
     }
 
-    /**
-     * @param int $timeout
-     * @return null|Socket
-     */
-    public function accept(int $timeout = -1): ?Socket
+    public function accept(float $timeout = -1.0): ?Socket
     {
         $socket = @\stream_socket_accept($this->socket, $timeout);
         if (\is_resource($socket)) {
@@ -176,7 +173,7 @@ class SocketServer extends Socket
      *
      * @param string $ip
      * @param int|null $port
-     * @param array $options
+     * @param array<string, mixed> $options
      * @return SocketServer
      * @throws ConnectionException
      */
@@ -196,7 +193,7 @@ class SocketServer extends Socket
      *
      * @param string $ip
      * @param int $port
-     * @param array $options
+     * @param array<string, mixed> $options
      * @return SocketServer
      * @throws ConnectionException
      */
@@ -220,7 +217,7 @@ class SocketServer extends Socket
      *
      * @param string $ip
      * @param int $port
-     * @param array $options
+     * @param array<string, mixed> $options
      * @return SocketServer
      * @throws ConnectionException
      */
@@ -243,7 +240,7 @@ class SocketServer extends Socket
      * Created a UNIX based socket server.
      *
      * @param string $socketFile
-     * @param array $options
+     * @param array<string, mixed> $options
      * @return SocketServer
      * @throws ConnectionException
      */
