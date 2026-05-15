@@ -91,6 +91,13 @@ def make_user_ldif(uid, first, last, mail, row, password_hash):
     homepage = (row or {}).get("homepage", "").strip()
     if homepage:
         classes.append("objectClass: labeledURIObject")
+    # `c` (countryName) isn't allowed on inetOrgPerson by the default
+    # NIS schema. extensibleObject (RFC 4512) opens the entry to any
+    # attribute — the cheapest way to honour the TESTPLAN's country -> c
+    # mapping without dragging in a custom schema.
+    country = (row or {}).get("country", "").strip()
+    if country:
+        classes.append("objectClass: extensibleObject")
 
     lines = [f"dn: uid={uid},{PEOPLE_OU}"]
     lines.extend(classes)
