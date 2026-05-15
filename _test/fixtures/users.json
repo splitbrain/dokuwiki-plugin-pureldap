@@ -1,0 +1,143 @@
+{
+  "_comment": "Source of truth for integration fixtures. Applied by provision.php which shells out to ldapadd (openldap) and samba-tool/ldbmodify via docker exec (samba). Each entity lists the backends it should land on; backend-specific extras live under per-backend keys.",
+
+  "domains": {
+    "openldap": {
+      "host":      "localhost",
+      "port":      1389,
+      "bind_dn":   "cn=admin,dc=example,dc=org",
+      "bind_pw":   "adminpass",
+      "base":      "dc=example,dc=org",
+      "people_ou": "ou=People,dc=example,dc=org",
+      "groups_ou": "ou=Groups,dc=example,dc=org",
+      "probe_user": "alice"
+    },
+    "samba": {
+      "container":  "pureldap-samba",
+      "host":       "localhost",
+      "port":       7389,
+      "base":       "DC=example,DC=local",
+      "users_dn":   "CN=Users,DC=example,DC=local",
+      "ldb_path":   "/var/lib/samba/private/sam.ldb",
+      "probe_user": "a.legrand"
+    }
+  },
+
+  "password_policy": {
+    "samba": { "max_pwd_age_days": 42 }
+  },
+
+  "groups": [
+    { "name": "devs",          "backends": ["openldap"], "openldap": { "gid": 5001 } },
+    { "name": "ops",           "backends": ["openldap"], "openldap": { "gid": 5002 } },
+    { "name": "admins",        "backends": ["openldap"], "openldap": { "gid": 5003 } },
+
+    { "name": "alpha",         "backends": ["samba"] },
+    { "name": "beta",          "backends": ["samba"], "samba": { "memberGroups": ["Gamma Nested"] } },
+    { "name": "Gamma Nested",  "backends": ["samba"] }
+  ],
+
+  "users": [
+    {
+      "uid":         "alice",
+      "backends":    ["openldap"],
+      "givenName":   "Alice",
+      "sn":          "Example",
+      "cn":          "Alice Example",
+      "mail":        "alice@example.org",
+      "password":    "password",
+      "memberOf":    ["devs", "admins"],
+      "openldap":    { "uidNumber": 1001, "gidNumber": 5001, "homeDirectory": "/home/alice" }
+    },
+    {
+      "uid":         "bob",
+      "backends":    ["openldap"],
+      "givenName":   "Bob",
+      "sn":          "Example",
+      "cn":          "Bob Example",
+      "mail":        "bob@example.org",
+      "password":    "password",
+      "memberOf":    ["devs", "ops"],
+      "openldap":    { "uidNumber": 1002, "gidNumber": 5002, "homeDirectory": "/home/bob" }
+    },
+
+    {
+      "uid":       "a.legrand",
+      "backends":  ["samba"],
+      "givenName": "Amerigo",
+      "sn":        "Legrand",
+      "mail":      "a.legrand@example.com",
+      "mobile":    "+63 (483) 526-8809",
+      "password":  "Foo_b_ar123!",
+      "memberOf":  ["beta", "Gamma Nested"],
+      "_comment":  "DONT_EXPIRE_PASSWD bit set so ADClientTest::testGetUser sees expires=false (NORMAL_ACCOUNT 512 | DONT_EXPIRE_PASSWD 65536 = 66048)",
+      "samba":     { "userAccountControl": 66048 }
+    },
+    {
+      "uid":       "a.blaskett",
+      "backends":  ["samba"],
+      "givenName": "Allene",
+      "sn":        "Blaskett",
+      "mail":      "a.blaskett@example.com",
+      "password":  "Foo_b_ar123!",
+      "memberOf":  ["alpha"]
+    },
+    {
+      "uid":       "andras.k",
+      "backends":  ["samba"],
+      "_comment":  "testGetFilteredUsers asserts STARTSWITH match on givenName 'Andras'",
+      "givenName": "Andras",
+      "sn":        "Kovac",
+      "mail":      "andras.k@example.com",
+      "password":  "Foo_b_ar123!",
+      "memberOf":  ["alpha"]
+    },
+    {
+      "uid":       "m.albro",
+      "backends":  ["samba"],
+      "givenName": "Maire",
+      "sn":        "Albro",
+      "mail":      "m.albro@example.com",
+      "password":  "Foo_b_ar123!",
+      "memberOf":  ["Gamma Nested"]
+    },
+    {
+      "uid":       "m.mcnevin",
+      "backends":  ["samba"],
+      "givenName": "Mike",
+      "sn":        "McNevin",
+      "mail":      "m.mcnevin@example.com",
+      "password":  "Foo_b_ar123!",
+      "memberOf":  ["Gamma Nested"]
+    },
+    {
+      "uid":       "x.guiu",
+      "backends":  ["samba"],
+      "givenName": "Xanthus",
+      "sn":        "Guiu",
+      "mail":      "x.guiu@example.com",
+      "password":  "Foo_b_ar123!"
+    },
+    {
+      "uid":       "averylongusernamethatisverylong",
+      "backends":  ["samba"],
+      "givenName": "Long",
+      "sn":        "Username",
+      "mail":      "long@example.com",
+      "password":  "Foo_b_ar123!"
+    }
+  ],
+
+  "padding": {
+    "backends":         ["samba"],
+    "_comment":         "Bulk filler users so count assertions pass: Domain Users > 250, alpha in [20,150). First 28 go into alpha; rest are unaffiliated.",
+    "count":            260,
+    "uid_format":       "p.user%03d",
+    "givenName_format": "P%d",
+    "sn":               "User",
+    "password":         "Foo_b_ar123!",
+    "memberships":      [
+      { "group": "alpha", "first_n": 28 }
+    ]
+  }
+}

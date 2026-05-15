@@ -1,17 +1,13 @@
 name: Integration tests
 
-# Single workflow that drives every "real server" integration target —
-# currently OpenLDAP and Samba 4 AD-DC. Each matrix entry points at a
-# docker-compose fixture and a self-contained provision.sh that knows
-# how to wait for that fixture, run any post-boot setup, and sanity-
-# probe it with ldapsearch. Adding a new target means: drop in a
-# compose file, drop in fixtures/<name>/provision.sh, add a matrix row.
+# One workflow, one matrix, one provisioning entry point.
+# Each fixture target points at a compose file and a backend name; the
+# rest of the pipeline is identical. Adding a new target means a new
+# compose file, a new matrix row, and a new backend handler in
+# _test/fixtures/provision.php.
 
 on: [push, pull_request]
 
-# Cancel any prior queued/running run for the same branch on a new push.
-# Stops orphaned "queued" jobs from piling up when GitHub Actions has a
-# runner-allocation hiccup.
 concurrency:
     group: ${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: true
@@ -51,16 +47,6 @@ jobs:
             - name: Checkout
               uses: actions/checkout@v4
 
-            - name: Verify fixture artifacts are in sync with people.json
-              run: |
-                bash _test/fixtures/regenerate.sh
-                if ! git diff --exit-code \
-                        _test/fixtures/openldap/bootstrap.ldif \
-                        _test/fixtures/samba/provision-data.sh; then
-                    echo "::error::Generated fixture artifacts are stale. Run _test/fixtures/regenerate.sh and commit the result."
-                    exit 1
-                fi
-
             - name: Setup PHP
               uses: shivammathur/setup-php@v2
               with:
@@ -72,17 +58,16 @@ jobs:
                 echo ::add-matcher::${{ runner.tool_cache }}/php.json
                 echo ::add-matcher::${{ runner.tool_cache }}/phpunit.json
 
-            - name: Install ldap-utils for fixture probing
+            - name: Install ldap-utils
               run: sudo apt-get update -qq && sudo apt-get install -y -qq ldap-utils
 
             - name: Start ${{ matrix.fixture.label }} fixture
               run: |
-                set -ex
                 docker compose -f ${{ matrix.fixture.compose }} up -d
                 docker compose -f ${{ matrix.fixture.compose }} ps
 
-            - name: Provision and verify fixture
-              run: bash _test/fixtures/${{ matrix.fixture.name }}/provision.sh
+            - name: Provision fixture
+              run: php _test/fixtures/provision.php --backend ${{ matrix.fixture.name }}
 
             - name: Create DokuWiki environment
               uses: dokuwiki/github-action/.github/actions/dokuenv@main

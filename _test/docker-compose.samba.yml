@@ -7,9 +7,14 @@
 #
 # Usage:
 #   docker compose -f _test/docker-compose.samba.yml up -d
-#   bash _test/fixtures/samba/provision.sh
+#   php _test/fixtures/provision.php --backend samba
 #   php phpunit.phar --group plugin_pureldap _test/ADClientTest.php
 #   docker compose -f _test/docker-compose.samba.yml down -v
+#
+# Data lives in _test/fixtures/users.json and is loaded by provision.php,
+# which docker-execs samba-tool and ldbmodify inside this container. The
+# only in-container artifact is regen-tls.sh, called once at the end of
+# provisioning to reissue the LDAPS cert with a localhost SAN.
 
 services:
   samba:
@@ -34,5 +39,4 @@ services:
       - "7389:389"
       - "7636:636"
     volumes:
-      - ./fixtures/samba/provision-fixture.sh:/provision-fixture.sh:ro
-      - ./fixtures/samba/provision-data.sh:/provision-data.sh:ro
+      - ./fixtures/samba/regen-tls.sh:/regen-tls.sh:ro

@@ -4,12 +4,14 @@ version: "3.8"
 #
 # Usage:
 #   docker compose -f _test/docker-compose.openldap.yml up -d
+#   php _test/fixtures/provision.php --backend openldap
 #   LDAP_TEST_HOST=localhost LDAP_TEST_PORT=1389 phpunit _test/integration/LDAPClientTest.php
 #   docker compose -f _test/docker-compose.openldap.yml down
 #
-# The image seeds two sample users (alice, bob) and three groups
-# (devs, ops, admins) with the memberOf overlay enabled so both the
-# grouptree and memberof strategies can be exercised.
+# Data lives in _test/fixtures/users.json and is loaded by provision.php
+# via ldapadd after the container is up. The image starts empty — no
+# auto-loaded bootstrap LDIF — so the test data path is identical to
+# the Samba path: same JSON spec, same provisioner, different CLI.
 
 services:
   openldap:
@@ -21,11 +23,7 @@ services:
       LDAP_ADMIN_PASSWORD: "adminpass"
       LDAP_TLS: "false"
       # Stay on the default NIS schema. RFC 2307bis turns posixGroup
-      # into an AUXILIARY objectClass, which makes the bootstrap LDIF
-      # (groups carry posixGroup as their structural class) fail to
-      # load and silently leaves slapd with no test data.
+      # into an AUXILIARY objectClass, which would make provision.php's
+      # group entries (posixGroup is structural) fail to add.
     ports:
       - "1389:389"
-    volumes:
-      - ./fixtures/openldap/bootstrap.ldif:/container/service/slapd/assets/config/bootstrap/ldif/50-bootstrap.ldif:ro
-    command: ["--copy-service"]
