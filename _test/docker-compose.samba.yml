@@ -1,0 +1,38 @@
+# Samba 4 AD-DC fixture for pureldap's ADClient tests.
+#
+# Stands in for splitbrain/vagrant-active-directory — close enough on
+# protocol surface (sAMAccountName, UPN, memberOf, primaryGroupID,
+# unicodePwd, maxPwdAge, userAccountControl) that ADClientTest et al.
+# pass without server-specific tweaks.
+#
+# Usage:
+#   docker compose -f _test/docker-compose.samba.yml up -d
+#   docker exec pureldap-samba /provision-fixture.sh
+#   php phpunit.phar --group plugin_pureldap _test/ADClientTest.php
+#   docker compose -f _test/docker-compose.samba.yml down -v
+
+services:
+  samba:
+    image: nowsci/samba-domain:latest
+    container_name: pureldap-samba
+    hostname: dc1
+    # AD-DC needs to control its own hostname resolution
+    domainname: example.local
+    privileged: true
+    environment:
+      DOMAIN: "EXAMPLE.LOCAL"
+      DOMAINPASS: "Vagrantvagrantvagrant1"
+      DOMAIN_NETBIOS: "EXAMPLE"
+      DOMAIN_EMAIL: "admin@example.local"
+      DNSFORWARDER: "1.1.1.1"
+      HOSTIP: "127.0.0.1"
+      INSECURELDAP: "true"
+      MULTISITE: "false"
+      NOCOMPLEXITY: "false"
+      DISABLE_DNS: "false"
+    ports:
+      - "7389:389"
+      - "7636:636"
+    volumes:
+      - ./fixtures/samba/provision-fixture.sh:/provision-fixture.sh:ro
+      - ./fixtures/samba/regenerate-tls.sh:/regenerate-tls.sh:ro

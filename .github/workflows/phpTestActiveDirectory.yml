@@ -1,0 +1,105 @@
+name: Tests for AD
+
+# Drives the AD-against-a-real-server tests (ADClientTest, AuthTest,
+# GroupHierarchyCacheTest) against a Samba 4 AD-DC. Samba stands in for
+# the splitbrain/vagrant-active-directory fixture — Vagrant is no longer
+# available on GitHub-hosted runners. Samba implements the AD LDAP
+# surface pureldap touches (sAMAccountName, UPN, memberOf,
+# primaryGroupID=513, unicodePwd over LDAPS, maxPwdAge,
+# userAccountControl), so the existing tests work with a matching
+# fixture.
+
+on: [push, pull_request]
+
+jobs:
+    testAD:
+        name: AD integration tests (PHP ${{ matrix.php-version }}, DokuWiki ${{ matrix.dokuwiki-branch }})
+        runs-on: ubuntu-latest
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+
+        strategy:
+            matrix:
+                php-version: ['8.2']
+                dokuwiki-branch: ['master']
+            fail-fast: false
+
+        env:
+            COMPOSER: _test/composer.json
+            COMPOSER_VENDOR_DIR: _test/vendor
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup PHP
+              uses: shivammathur/setup-php@v2
+              with:
+                  php-version: ${{ matrix.php-version }}
+                  extensions: mbstring, intl, PDO, pdo_sqlite, bz2
+
+            - name: Setup problem matchers
+              run: |
+                echo ::add-matcher::${{ runner.tool_cache }}/php.json
+                echo ::add-matcher::${{ runner.tool_cache }}/phpunit.json
+
+            - name: Start Samba AD-DC
+              run: |
+                set -ex
+                docker compose -f _test/docker-compose.samba.yml up -d
+                docker compose -f _test/docker-compose.samba.yml ps
+
+            - name: Wait for Samba LDAP to accept connections
+              run: |
+                set -e
+                # Samba's first-boot provisioning typically takes 30-90s.
+                # Be generous on the ceiling.
+                for i in $(seq 1 240); do
+                  if (echo > /dev/tcp/localhost/7389) 2>/dev/null; then
+                    echo "Samba LDAP port open after ${i}s"
+                    break
+                  fi
+                  sleep 1
+                done
+                if ! (echo > /dev/tcp/localhost/7389) 2>/dev/null; then
+                  echo "::error::Samba LDAP did not come up"
+                  docker compose -f _test/docker-compose.samba.yml logs --tail=200
+                  exit 1
+                fi
+
+            - name: Provision the AD fixture
+              run: |
+                set -ex
+                docker exec pureldap-samba /provision-fixture.sh
+                docker exec pureldap-samba /regenerate-tls.sh
+                # Give samba a moment to pick up the new cert.
+                sleep 5
+
+            - name: Sanity-probe with ldapsearch
+              run: |
+                sudo apt-get update -qq
+                sudo apt-get install -y -qq ldap-utils
+                ldapsearch -x -H ldap://localhost:7389 \
+                    -b "DC=example,DC=local" \
+                    -D "Administrator@example.local" \
+                    -w "Vagrantvagrantvagrant1" \
+                    "(sAMAccountName=a.legrand)" \
+                    sAMAccountName mail mobile \
+                    | tee /tmp/ldapsearch.out
+                grep -q "sAMAccountName: a.legrand" /tmp/ldapsearch.out
+                grep -q "mail: a.legrand@example.com" /tmp/ldapsearch.out
+
+            - name: Create DokuWiki Environment
+              id: dokuwiki-env
+              uses: dokuwiki/github-action/.github/actions/dokuenv@main
+              with:
+                  branch: ${{ matrix.dokuwiki-branch }}
+
+            - name: Install Composer Dependencies
+              run: composer install --no-progress --no-interaction --prefer-dist --optimize-autoloader --no-scripts
+
+            - name: Run ADClient integration tests
+              run: composer exec -- phpunit -c _test/phpunit.xml --verbose --stderr --group plugin_pureldap --filter '/^(ADClientTest|AuthTest|GroupHierarchyCacheTest)::/'
+
+            - name: Dump Samba logs on failure
+              if: failure()
+              run: docker logs pureldap-samba --tail=300 || true
