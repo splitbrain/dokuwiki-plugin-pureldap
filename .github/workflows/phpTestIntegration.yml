@@ -73,7 +73,3 @@ jobs:
               run: |
                 docker compose -f _test/docker-compose.yml ps -a
                 docker compose -f _test/docker-compose.yml logs --tail=300 || true
-                echo "---- openldap /tmp/provision.log ----"
-                docker exec pureldap-openldap cat /tmp/provision.log 2>/dev/null || echo "(no log file)"
-                echo "---- samba /tmp/provision.log ----"
-                docker exec pureldap-samba cat /tmp/provision.log 2>/dev/null || echo "(no log file)"

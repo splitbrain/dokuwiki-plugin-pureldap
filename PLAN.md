@@ -367,10 +367,10 @@ Three tiers:
    parameterised constructor.
 2. **AD integration (existing)**: keep `_test/ADClientTest.php`,
    `_test/AuthTest.php`, `_test/GeneralTest.php`,
-   `_test/GroupHierarchyCacheTest.php` running against
-   vagrant-active-directory on `localhost:7389`; skip cleanly when
-   unreachable. With AD now inheriting from `LDAPClient`, these tests
-   also exercise the universal code path — strong regression coverage.
+   `_test/GroupHierarchyCacheTest.php` running against the Samba AD-DC
+   fixture on `localhost:7389`; skip cleanly when unreachable. With AD
+   now inheriting from `LDAPClient`, these tests also exercise the
+   universal code path — strong regression coverage.
 3. **LDAP integration (new)**: `_test/integration/LDAPClientTest.php`
    gated on `LDAP_TEST_HOST`; ship a `_test/docker-compose.openldap.yml`
    using `osixia/openldap` with sample posix users/groups and the
@@ -490,7 +490,7 @@ End-to-end smoke tests, run in order:
 1. **AD regression** — with `directory_type=ad` (default), run all of
    `_test/ADClientTest.php`, `_test/AuthTest.php`,
    `_test/GroupHierarchyCacheTest.php`, `_test/GeneralTest.php` against
-   vagrant-active-directory. All must pass. (After step 3, these
+   the Samba AD-DC fixture. All must pass. (After step 3, these
    simultaneously exercise the new `LDAPClient` base path.)
 2. **AD live login** — bring up a DokuWiki against an AD with the
    existing pureldap config; verify login, group listing, user listing,
