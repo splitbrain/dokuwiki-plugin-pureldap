@@ -11,6 +11,13 @@ name: Tests for AD
 
 on: [push, pull_request]
 
+# Cancel any prior queued/running run for the same branch on a new push.
+# Stops orphaned "queued" jobs from piling up when GitHub Actions has a
+# runner-allocation hiccup.
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
 jobs:
     testAD:
         name: AD integration tests (PHP ${{ matrix.php-version }}, DokuWiki ${{ matrix.dokuwiki-branch }})
