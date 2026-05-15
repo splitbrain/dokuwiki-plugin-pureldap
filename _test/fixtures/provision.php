@@ -38,6 +38,7 @@ abstract class Provisioner
     public function run(): void
     {
         $name = (new ReflectionClass($this))->getShortName();
+        $this->waitUntilReady();
         if ($this->isAlreadyProvisioned()) {
             echo "[{$name}] already provisioned, skipping\n";
             return;
@@ -70,6 +71,7 @@ abstract class Provisioner
         echo "[{$name}] done\n";
     }
 
+    abstract protected function waitUntilReady(): void;
     abstract protected function isAlreadyProvisioned(): bool;
     abstract protected function ensureRoot(): void;
     abstract protected function applyPasswordPolicy(): void;
@@ -150,6 +152,19 @@ class OpenLDAPProvisioner extends Provisioner
         $this->bindPw   = $this->env('OPENLDAP_BIND_PW');
         $this->peopleOu = $this->env('OPENLDAP_PEOPLE_OU');
         $this->groupsOu = $this->env('OPENLDAP_GROUPS_OU');
+    }
+
+    protected function waitUntilReady(): void
+    {
+        echo "[OpenLDAPProvisioner] waiting for slapd...\n";
+        $deadline = time() + 120;
+        while (time() < $deadline) {
+            if ($this->entryExists($this->env('OPENLDAP_BASE'))) {
+                return;
+            }
+            usleep(500_000);
+        }
+        throw new RuntimeException("slapd did not become responsive within 120s");
     }
 
     protected function isAlreadyProvisioned(): bool
@@ -304,6 +319,21 @@ class SambaProvisioner extends Provisioner
         parent::__construct($spec);
         $this->container = $this->env('SAMBA_CONTAINER');
         $this->usersDn   = $this->env('SAMBA_USERS_DN');
+    }
+
+    protected function waitUntilReady(): void
+    {
+        echo "[SambaProvisioner] waiting for samba-tool (this is slow, samba self-provisions the domain first)...\n";
+        $deadline = time() + 300;
+        while (time() < $deadline) {
+            $ok = 0 === $this->runCmdStatus([
+                'docker', 'exec', $this->container,
+                'samba-tool', 'user', 'list',
+            ]);
+            if ($ok) return;
+            sleep(2);
+        }
+        throw new RuntimeException("samba did not become responsive within 300s");
     }
 
     protected function isAlreadyProvisioned(): bool

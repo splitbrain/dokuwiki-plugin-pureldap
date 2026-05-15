@@ -43,13 +43,11 @@ jobs:
                 echo ::add-matcher::${{ runner.tool_cache }}/phpunit.json
 
             - name: Bring up fixtures
-              # Two-step on purpose. 'docker compose run' starts
-              # dependencies but doesn't reliably wait for
-              # service_healthy, so 'up --wait openldap samba' first
-              # to block until both healthchecks pass, then 'run
-              # --rm provisioner' to apply users.json synchronously.
+              # The provisioner has its own retry loops for both
+              # backends, so we don't need healthchecks at the compose
+              # layer. 'run --rm' is synchronous on the provisioner —
+              # by the time it exits, both LDAP services are populated.
               run: |
-                docker compose -f _test/docker-compose.yml up -d --wait openldap samba
                 docker compose -f _test/docker-compose.yml run --rm -T provisioner
                 docker compose -f _test/docker-compose.yml ps
 
