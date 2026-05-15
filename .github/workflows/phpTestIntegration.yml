@@ -1,9 +1,10 @@
 name: Integration tests
 
-# Single job. `docker compose run --rm provisioner` brings up both LDAP
-# backends and applies users.json to each via the OO provisioner. After
-# it exits, phpunit runs the openldap-targeted suite against localhost:1389
-# and the AD-targeted suite against localhost:7389.
+# 'docker compose up -d --wait' is the entire fixture setup: both LDAP
+# services bring themselves up, run provision.py via their post_start
+# hook, and their healthchecks gate on the sentinel file the script
+# drops when it finishes. By the time --wait returns both backends are
+# populated and phpunit can run.
 
 on: [push, pull_request]
 
@@ -43,25 +44,9 @@ jobs:
                 echo ::add-matcher::${{ runner.tool_cache }}/phpunit.json
 
             - name: Bring up fixtures
-              # The provisioner has its own retry loops for both
-              # backends, so we don't need healthchecks at the compose
-              # layer. 'up -d' starts every service including the
-              # provisioner; we then 'docker wait' for the provisioner
-              # to exit and surface its logs + exit code. (Using 'up'
-              # + 'docker wait' instead of 'compose run' so the
-              # provisioner container persists for log inspection
-              # after failure.)
               run: |
-                set -e
-                docker compose -f _test/docker-compose.yml up -d
-                docker compose -f _test/docker-compose.yml ps -a
-                provisioner_id=$(docker compose -f _test/docker-compose.yml ps -aq provisioner)
-                echo "Waiting for provisioner ${provisioner_id} to finish..."
-                exit_code=$(docker wait "${provisioner_id}")
-                echo "---- provisioner logs ----"
-                docker logs "${provisioner_id}"
-                echo "---- provisioner exited ${exit_code} ----"
-                [ "${exit_code}" = "0" ]
+                docker compose -f _test/docker-compose.yml up -d --wait
+                docker compose -f _test/docker-compose.yml ps
 
             - name: Create DokuWiki environment
               uses: dokuwiki/github-action/.github/actions/dokuenv@main
@@ -88,3 +73,7 @@ jobs:
               run: |
                 docker compose -f _test/docker-compose.yml ps -a
                 docker compose -f _test/docker-compose.yml logs --tail=300 || true
+                echo "---- openldap /tmp/provision.log ----"
+                docker exec pureldap-openldap cat /tmp/provision.log 2>/dev/null || echo "(no log file)"
+                echo "---- samba /tmp/provision.log ----"
+                docker exec pureldap-samba cat /tmp/provision.log 2>/dev/null || echo "(no log file)"
