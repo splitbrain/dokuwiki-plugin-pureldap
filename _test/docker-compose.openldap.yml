@@ -1,0 +1,28 @@
+version: "3.8"
+
+# OpenLDAP fixture for pureldap's LDAPClient integration tests.
+#
+# Usage:
+#   docker compose -f _test/docker-compose.openldap.yml up -d
+#   LDAP_TEST_HOST=localhost LDAP_TEST_PORT=1389 phpunit _test/integration/LDAPClientTest.php
+#   docker compose -f _test/docker-compose.openldap.yml down
+#
+# The image seeds two sample users (alice, bob) and three groups
+# (devs, ops, admins) with the memberOf overlay enabled so both the
+# grouptree and memberof strategies can be exercised.
+
+services:
+  openldap:
+    image: osixia/openldap:1.5.0
+    container_name: pureldap-openldap
+    environment:
+      LDAP_ORGANISATION: "Pureldap Test"
+      LDAP_DOMAIN: "example.org"
+      LDAP_ADMIN_PASSWORD: "adminpass"
+      LDAP_TLS: "false"
+      LDAP_RFC2307BIS_SCHEMA: "true"
+    ports:
+      - "1389:389"
+    volumes:
+      - ./fixtures/openldap/bootstrap.ldif:/container/service/slapd/assets/config/bootstrap/ldif/50-bootstrap.ldif:ro
+    command: ["--copy-service"]
