@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """Apply users.csv + groups.csv to the OpenLDAP container.
 
-Driven by the compose post_start hook after setup.sh has installed
-ldap-utils and created the OUs. The same CSV files also feed the
-samba provisioner — they're the upstream vagrant
-(splitbrain/vagrant-active-directory) test data, used verbatim.
+Invoked via `docker exec` after setup.sh has installed ldap-utils and
+created the OUs. The same CSV files also feed the samba provisioner —
+they're the upstream vagrant (splitbrain/vagrant-active-directory)
+test data, used verbatim.
 
 Idempotent: probes for uid=a.legrand and exits early if the data is
-already there. On success touches /tmp/provisioned which the
-compose healthcheck reads.
+already there.
 """
 
 import csv

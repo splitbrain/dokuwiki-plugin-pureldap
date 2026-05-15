@@ -22,15 +22,21 @@ services:
     image: alpine:3.20
     volumes:
       - tls-certs:/certs
-    command: >
-      sh -c "apk add --no-cache openssl >/dev/null &&
-             [ -f /certs/cert.pem ] && exit 0 ||
-             openssl req -x509 -newkey rsa:2048 -nodes -days 3650
-               -keyout /certs/key.pem -out /certs/cert.pem
-               -subj '/CN=localhost'
-               -addext 'subjectAltName=DNS:localhost,DNS:dc1.example.com,IP:127.0.0.1' &&
-             cp /certs/cert.pem /certs/ca.pem &&
-             chmod 644 /certs/*.pem"
+    # Sequence form (not the `>` folded scalar) — the folded form preserved
+    # newlines on the more-indented openssl args, which the shell then
+    # treated as separate commands.
+    command:
+      - sh
+      - -ec
+      - |
+        apk add --no-cache openssl >/dev/null
+        if [ -f /certs/cert.pem ]; then exit 0; fi
+        openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+            -keyout /certs/key.pem -out /certs/cert.pem \
+            -subj '/CN=localhost' \
+            -addext 'subjectAltName=DNS:localhost,DNS:dc1.example.com,IP:127.0.0.1'
+        cp /certs/cert.pem /certs/ca.pem
+        chmod 644 /certs/*.pem
 
   openldap:
     image: osixia/openldap:1.5.0

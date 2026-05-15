@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Runs once at container start via compose post_start, after first-boot
-# domain provisioning has produced sam.ldb. Sets the password-age policy
-# explicitly (so testMaxPasswordAge can't drift) and installs the shared
-# TLS material from the tls-init volume mounted read-only at /certs.
+# Invoked once by the workflow (or by hand) via `docker exec` once the
+# samba container is up. Waits for first-boot domain provisioning to
+# finish (samba-tool returns 0), sets the password-age policy explicitly
+# so testMaxPasswordAge can't drift, and installs the shared TLS material
+# from the tls-init volume mounted read-only at /certs.
 set -euo pipefail
 
 TLS_SRC="/certs"

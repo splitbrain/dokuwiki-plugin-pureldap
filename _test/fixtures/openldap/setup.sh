@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Runs once at container start via compose post_start. Installs the
-# ldap-utils package (osixia/openldap doesn't ship it) and creates
-# the two OUs the provisioner writes into.
+# Invoked once by the workflow (or by hand) via `docker exec` once the
+# openldap container is up. Installs the ldap-utils package (osixia
+# doesn't ship it), waits for slapd, then creates the two OUs the
+# provisioner writes into.
 set -euo pipefail
 
 HOST="localhost"

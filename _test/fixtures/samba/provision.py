@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Apply users.csv + groups.csv to the Samba AD-DC container.
 
-Driven by the compose post_start hook after setup.sh has installed
-TLS material and set the password policy. Builds users via
-samba-tool for the attributes that have CLI flags and an LDIF +
-ldbmodify pass for the rest (mobile, wWWHomePage, personalTitle,
-userAccountControl=66048 for never-expires).
+Invoked via `docker exec` after setup.sh has installed TLS material
+and set the password policy. Builds users via samba-tool for the
+attributes that have CLI flags and an LDIF + ldbmodify pass for the
+rest (mobile, wWWHomePage, personalTitle, userAccountControl=66048
+for never-expires).
 
 Idempotent: probes samba-tool user show a.legrand and exits early
-if the user is already there. Touches /tmp/provisioned on success.
+if the user is already there.
 """
 
 import csv
