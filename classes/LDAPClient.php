@@ -48,6 +48,7 @@ class LDAPClient extends Client
             'userClass' => 'inetOrgPerson',
             'groupClass' => 'groupOfNames',
             'memberof_attr' => 'memberOf',
+            'group_member_attr' => 'memberUid',
             'password_attr' => 'userPassword',
             'userfilter' => '',
             'groupfilter' => '',
@@ -251,23 +252,12 @@ class LDAPClient extends Client
             $filter->add(Filters::$filtermethod($this->config['mailkey'], $match['mail']));
         }
         if (isset($match['grps'])) {
-            // memberOf can't be substring-matched; resolve to group DNs first
-            $groups = $this->getGroups($match['grps'], $filtermethod);
-            $groupDNs = array_keys($groups);
-
-            if ($this->config['recursivegroups']) {
-                $gch = $this->getGroupHierarchyCache();
-                foreach ($groupDNs as $dn) {
-                    $groupDNs = array_merge($groupDNs, $gch->getChildren($dn));
-                }
-                $groupDNs = array_unique($groupDNs);
+            $clause = $this->buildGroupMembershipClause($match['grps'], $filtermethod);
+            if ($clause === null) {
+                // No matching group, so no users can match either.
+                return [];
             }
-
-            $or = Filters::or();
-            foreach ($groupDNs as $dn) {
-                $or->add($this->groupMembershipFilter($dn));
-            }
-            $filter->add($or);
+            $filter->add($clause);
         }
 
         $this->debug('Searching ' . $filter->toString(), __FILE__, __LINE__);
@@ -611,6 +601,115 @@ class LDAPClient extends Client
     protected function groupMembershipFilter($groupDn)
     {
         return Filters::equal($this->config['memberof_attr'], $groupDn);
+    }
+
+    /**
+     * Build the filter clause for `getFilteredUsers(['grps' => ...])`.
+     *
+     * In memberof-style directories the user entries carry the
+     * relationship, so we resolve the named group(s) to DNs and OR-in
+     * one {@see groupMembershipFilter()} clause per DN.
+     *
+     * In grouptree-style directories (RFC 2307 / posixGroup) the
+     * relationship lives on the *group*, so we fetch the configured
+     * member attribute from each matching group entry and OR-in
+     * `(userkey=<value>)` clauses against the user search.
+     *
+     * @param string $groupMatch
+     * @param string $filtermethod one of the FILTER_* constants
+     * @return FilterInterface|null Null when no group matched.
+     */
+    protected function buildGroupMembershipClause($groupMatch, $filtermethod)
+    {
+        if ($this->resolveBulkGroupStrategy() === 'grouptree') {
+            return $this->groupTreeMembershipClause($groupMatch, $filtermethod);
+        }
+
+        $groups = $this->getGroups($groupMatch, $filtermethod);
+        $groupDNs = array_keys($groups);
+        if (empty($groupDNs)) return null;
+
+        if ($this->config['recursivegroups']) {
+            $gch = $this->getGroupHierarchyCache();
+            foreach ($groupDNs as $dn) {
+                $groupDNs = array_merge($groupDNs, $gch->getChildren($dn));
+            }
+            $groupDNs = array_unique($groupDNs);
+        }
+
+        $or = Filters::or();
+        foreach ($groupDNs as $dn) {
+            $or->add($this->groupMembershipFilter($dn));
+        }
+        return $or;
+    }
+
+    /**
+     * Resolve `group_strategy=auto` without a specific user entry — used
+     * by bulk operations like {@see getFilteredUsers()}. Falls back to
+     * `grouptree` when a groupfilter is configured, otherwise `memberof`.
+     *
+     * @return string one of grouptree|memberof|none
+     */
+    protected function resolveBulkGroupStrategy()
+    {
+        $strategy = $this->config['group_strategy'] ?? 'auto';
+        if ($strategy !== 'auto') return $strategy;
+        return $this->config['groupfilter'] !== '' ? 'grouptree' : 'memberof';
+    }
+
+    /**
+     * Read the member attribute from groups matching `$groupMatch` and
+     * build a `(userkey=<value> OR ...)` filter against the user search.
+     *
+     * RFC 2307bis `member` attributes hold DNs rather than uids; we don't
+     * try to support that here in v1.
+     *
+     * @param string $groupMatch
+     * @param string $filtermethod
+     * @return FilterInterface|null Null when no group matched or no
+     *                              members were found.
+     */
+    protected function groupTreeMembershipClause($groupMatch, $filtermethod)
+    {
+        if (!$this->autoAuth()) return null;
+
+        $memberAttr = $this->config['group_member_attr'];
+        $groupFilter = Filters::and(
+            Filters::equal('objectClass', $this->config['groupClass']),
+            Filters::$filtermethod($this->config['groupkey'], $groupMatch)
+        );
+
+        $search = $this->applySearchScope(
+            Operations::search($groupFilter, $this->config['groupkey'], $memberAttr),
+            $this->config['grouptree'],
+            $this->config['groupscope']
+        );
+        $paging = $this->ldap->paging($search);
+
+        $members = [];
+        while ($paging->hasEntries()) {
+            try {
+                $entries = $paging->getEntries();
+            } catch (OperationException $e) {
+                $this->fatal($e);
+                return null;
+            }
+            foreach ($entries as $entry) {
+                if (!$entry->has($memberAttr)) continue;
+                foreach ($entry->get($memberAttr)->getValues() as $value) {
+                    $members[] = $value;
+                }
+            }
+        }
+        $members = array_unique($members);
+        if (empty($members)) return null;
+
+        $or = Filters::or();
+        foreach ($members as $value) {
+            $or->add(Filters::equal($this->config['userkey'], $value));
+        }
+        return $or;
     }
 
     /**

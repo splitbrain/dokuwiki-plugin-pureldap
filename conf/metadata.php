@@ -43,6 +43,7 @@ $meta['mailkey'] = array('string');
 $meta['userClass'] = array('string');
 $meta['groupClass'] = array('string');
 $meta['memberof_attr'] = array('string');
+$meta['group_member_attr'] = array('string');
 $meta['password_attr'] = array('string');
 $meta['binddn'] = array('string');
 $meta['group_strategy'] = array('multichoice', '_choices' => array('auto', 'grouptree', 'memberof', 'none'));

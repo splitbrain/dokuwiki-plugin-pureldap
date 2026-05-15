@@ -57,6 +57,7 @@ $lang['mailkey'] = '[LDAP only] Attribute that holds the user\'s email address.'
 $lang['userClass'] = '[LDAP only] objectClass value used in the fallback user search filter when no userfilter is set.';
 $lang['groupClass'] = '[LDAP only] objectClass value used to find group entries.';
 $lang['memberof_attr'] = '[LDAP only] Attribute on a user entry that lists their group DNs. Default <code>memberOf</code>.';
+$lang['group_member_attr'] = '[LDAP only] Attribute on a <em>group</em> entry that lists members in the RFC 2307 (posixGroup) model. Default <code>memberUid</code>. Used to find users that belong to a given group when <code>group_strategy=grouptree</code>.';
 $lang['password_attr'] = '[LDAP only] Attribute that holds the user\'s password.';
 $lang['binddn'] = '[LDAP only] DN template for direct user bind, e.g. <code>uid=%{user},ou=People,dc=example,dc=org</code>. Leave empty to search-then-bind using admin credentials.';
 $lang['group_strategy'] = '[LDAP only] How to resolve a user\'s group memberships.';

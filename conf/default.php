@@ -44,6 +44,7 @@ $conf['mailkey'] = 'mail';
 $conf['userClass'] = 'inetOrgPerson';
 $conf['groupClass'] = 'groupOfNames';
 $conf['memberof_attr'] = 'memberOf';
+$conf['group_member_attr'] = 'memberUid';
 $conf['password_attr'] = 'userPassword';
 $conf['binddn'] = '';
 $conf['group_strategy'] = 'auto';
