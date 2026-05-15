@@ -6,9 +6,11 @@ use dokuwiki\PassHash;
 use dokuwiki\Utf8\PhpString;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\FilterParseException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
+use FreeDSx\Ldap\Search\FilterParser;
 use FreeDSx\Ldap\Search\Filters;
 
 /**
@@ -68,12 +70,10 @@ class LDAPClient extends Client
     public function getUserEntry($username)
     {
         if (!$this->autoAuth()) return null;
-        $username = $this->cleanUser($username);
 
-        $filter = Filters::and(
-            Filters::equal('objectClass', $this->config['userClass']),
-            Filters::equal($this->config['userkey'], $username)
-        );
+        $filter = $this->buildUserSearchFilter($username);
+        if ($filter === null) return null;
+
         $this->debug('Searching ' . $filter->toString(), __FILE__, __LINE__);
 
         try {
@@ -85,6 +85,49 @@ class LDAPClient extends Client
         }
         if ($entries->count() !== 1) return null;
         return $entries->first();
+    }
+
+    /**
+     * Build the user-search filter, honouring a configured userfilter
+     * template if present and otherwise falling back to a structural
+     * match on userkey + userClass.
+     *
+     * @param string $username
+     * @return FilterInterface|null
+     */
+    protected function buildUserSearchFilter($username)
+    {
+        $template = $this->config['userfilter'] ?? '';
+        if ($template !== '') {
+            $placeholders = $this->userSearchPlaceholders($username);
+            $filterStr = FilterTemplate::substitute($template, $placeholders);
+            try {
+                return FilterParser::parse($filterStr);
+            } catch (FilterParseException $e) {
+                $this->error('Could not parse userfilter: ' . $filterStr, __FILE__, __LINE__);
+                return null;
+            }
+        }
+
+        $username = $this->cleanUser($username);
+        return Filters::and(
+            Filters::equal('objectClass', $this->config['userClass']),
+            Filters::equal($this->config['userkey'], $username)
+        );
+    }
+
+    /**
+     * Hook: placeholders available to the userfilter template. Subclasses
+     * may add directory-specific names (e.g. AD's `qualifieduser`).
+     *
+     * @param string $username
+     * @return array
+     */
+    protected function userSearchPlaceholders($username)
+    {
+        return [
+            'user' => $this->cleanUser($username),
+        ];
     }
 
     /** @inheritDoc */

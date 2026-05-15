@@ -7,7 +7,6 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
 
 /**
@@ -38,6 +37,8 @@ class ADClient extends LDAPClient
             'groupClass' => 'group',
             'memberof_attr' => 'memberOf',
             'password_attr' => 'unicodePwd',
+            'userfilter' =>
+                '(&(objectClass=user)(|(sAMAccountName=%{user})(userPrincipalName=%{qualifieduser})))',
         ];
         foreach ($adDefaults as $key => $val) {
             if (!isset($config[$key]) || $config[$key] === '' || $config[$key] === []) {
@@ -100,35 +101,18 @@ class ADClient extends LDAPClient
 
     /**
      * AD looks up users by either sAMAccountName (short form) or
-     * userPrincipalName (long form with @suffix). FilterTemplate-driven
-     * configuration will subsume this override in a later step.
+     * userPrincipalName (long form with @suffix); the seeded userfilter
+     * encodes that as two parallel filter clauses. This hook supplies
+     * the values to substitute for each placeholder.
      *
      * @inheritDoc
      */
-    public function getUserEntry($username)
+    protected function userSearchPlaceholders($username)
     {
-        if (!$this->autoAuth()) return null;
-        $samaccountname = $this->simpleUser($username);
-        $userprincipal = $this->qualifiedUser($username);
-
-        $filter = Filters::and(
-            Filters::equal('objectClass', 'user'),
-            Filters::or(
-                Filters::equal('sAMAccountName', $samaccountname),
-                Filters::equal('userPrincipalName', $userprincipal)
-            )
-        );
-        $this->debug('Searching ' . $filter->toString(), __FILE__, __LINE__);
-
-        try {
-            $attributes = $this->userAttributes();
-            $entries = $this->ldap->search(Operations::search($filter, ...$attributes));
-        } catch (OperationException $e) {
-            $this->fatal($e);
-            return null;
-        }
-        if ($entries->count() !== 1) return null;
-        return $entries->first();
+        return [
+            'user' => $this->simpleUser($username),
+            'qualifieduser' => $this->qualifiedUser($username),
+        ];
     }
 
     /** @inheritDoc */
