@@ -76,6 +76,8 @@ services:
       - sh
       - -c
       - |
-        apk add --no-cache --quiet openldap-clients docker-cli >/dev/null
+        set -ex
+        apk add --no-cache openldap-clients docker-cli
+        which ldapsearch docker php
         php /fixtures/provision.php
     restart: "no"

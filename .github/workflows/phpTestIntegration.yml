@@ -45,11 +45,23 @@ jobs:
             - name: Bring up fixtures
               # The provisioner has its own retry loops for both
               # backends, so we don't need healthchecks at the compose
-              # layer. 'run --rm' is synchronous on the provisioner —
-              # by the time it exits, both LDAP services are populated.
+              # layer. 'up -d' starts every service including the
+              # provisioner; we then 'docker wait' for the provisioner
+              # to exit and surface its logs + exit code. (Using 'up'
+              # + 'docker wait' instead of 'compose run' so the
+              # provisioner container persists for log inspection
+              # after failure.)
               run: |
-                docker compose -f _test/docker-compose.yml run --rm -T provisioner
-                docker compose -f _test/docker-compose.yml ps
+                set -e
+                docker compose -f _test/docker-compose.yml up -d
+                docker compose -f _test/docker-compose.yml ps -a
+                provisioner_id=$(docker compose -f _test/docker-compose.yml ps -aq provisioner)
+                echo "Waiting for provisioner ${provisioner_id} to finish..."
+                exit_code=$(docker wait "${provisioner_id}")
+                echo "---- provisioner logs ----"
+                docker logs "${provisioner_id}"
+                echo "---- provisioner exited ${exit_code} ----"
+                [ "${exit_code}" = "0" ]
 
             - name: Create DokuWiki environment
               uses: dokuwiki/github-action/.github/actions/dokuenv@main
