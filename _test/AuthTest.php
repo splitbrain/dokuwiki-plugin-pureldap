@@ -19,12 +19,12 @@ class AuthTest extends \DokuWikiTest {
 
         global $conf;
         $conf['auth'] = 'pureldap';
-        $conf['plugin']['pureldap']['base_dn'] = 'DC=example,DC=local';
-        $conf['plugin']['pureldap']['suffix'] = 'example.local';
+        $conf['plugin']['pureldap']['base_dn'] = 'dc=example,dc=com';
+        $conf['plugin']['pureldap']['suffix'] = 'example.com';
         $conf['plugin']['pureldap']['servers'] = ['localhost'];
         $conf['plugin']['pureldap']['port'] = 7636;
-        $conf['plugin']['pureldap']['admin_username'] = 'vagrant';
-        $conf['plugin']['pureldap']['admin_password'] = 'vagrant';
+        $conf['plugin']['pureldap']['admin_username'] = 'Administrator';
+        $conf['plugin']['pureldap']['admin_password'] = 'Foo_b_ar123!';
         $conf['plugin']['pureldap']['encryption'] = 'ssl';
         $conf['plugin']['pureldap']['validate'] = 'self';
     }

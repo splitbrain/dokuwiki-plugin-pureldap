@@ -1,70 +1,103 @@
-# Single compose file for both LDAP integration fixtures.
+# Integration fixtures for pureldap.
 #
-# Two services, each exposing a port to localhost. Each mounts
-# fixtures/ read-only; provision.py inside that directory is invoked
-# via 'docker exec' (e.g. by the CI workflow or by hand) once the
-# containers are up. The script handles its own readiness wait —
-# slapd binds in seconds, samba's AD-DC takes 30-90s.
+# `docker compose -f _test/docker-compose.yml up -d --wait` brings up
+# two LDAP backends populated identically from the same users.csv /
+# groups.csv: openldap on localhost:1389 / :1636 (StartTLS / LDAPS)
+# and samba AD-DC on localhost:7389 / :7636.
 #
-# Local usage:
-#   docker compose -f _test/docker-compose.yml up -d
-#   docker exec pureldap-openldap python3 /fixtures/provision.py --backend openldap
-#   docker exec pureldap-samba    python3 /fixtures/provision.py --backend samba
-#   # then point phpunit at localhost:1389 / localhost:7389
+# A one-shot tls-init service generates a single self-signed cert
+# (CN=localhost, SAN covers localhost / 127.0.0.1 / dc1.example.com)
+# into a named volume; both backends consume it from there.
 #
-# Connection details for each backend's provisioner are environment
-# variables on the matching service block. users.json is pure data.
+# Each backend has two post_start lifecycle hooks: setup.sh handles
+# one-shot in-container setup (apt install, OU seed, TLS install,
+# password policy), then provision.py applies the CSVs. A sentinel
+# file (/tmp/provisioned) gates the healthcheck so --wait blocks
+# until both backends are fully populated.
+
+volumes:
+  tls-certs:
 
 services:
+  tls-init:
+    image: alpine:3.20
+    volumes:
+      - tls-certs:/certs
+    command: >
+      sh -c "apk add --no-cache openssl >/dev/null &&
+             { [ -f /certs/cert.pem ] && exit 0; } ||
+             openssl req -x509 -newkey rsa:2048 -nodes -days 3650
+               -keyout /certs/key.pem -out /certs/cert.pem
+               -subj '/CN=localhost'
+               -addext 'subjectAltName=DNS:localhost,DNS:dc1.example.com,IP:127.0.0.1' &&
+             cp /certs/cert.pem /certs/ca.pem &&
+             chmod 644 /certs/*.pem"
+
   openldap:
     image: osixia/openldap:1.5.0
     container_name: pureldap-openldap
+    depends_on:
+      tls-init:
+        condition: service_completed_successfully
     environment:
-      LDAP_ORGANISATION: "Pureldap Test"
-      LDAP_DOMAIN:       "example.org"
-      LDAP_ADMIN_PASSWORD: "adminpass"
-      LDAP_TLS: "false"
+      LDAP_ORGANISATION:        "Pureldap Test"
+      LDAP_DOMAIN:              "example.com"
+      LDAP_ADMIN_PASSWORD:      "Foo_b_ar123!"
+      LDAP_TLS:                 "true"
+      LDAP_TLS_CRT_FILENAME:    "cert.pem"
+      LDAP_TLS_KEY_FILENAME:    "key.pem"
+      LDAP_TLS_CA_CRT_FILENAME: "ca.pem"
+      LDAP_TLS_VERIFY_CLIENT:   "never"
       # Stay on the default NIS schema. RFC 2307bis turns posixGroup
-      # into an AUXILIARY objectClass, which would make the
-      # provisioner's group entries (posixGroup is structural) fail.
-
-      # Read by provision.py inside this container.
-      PROVISION_HOST:      "localhost"
-      PROVISION_PORT:      "389"
-      PROVISION_BIND_DN:   "cn=admin,dc=example,dc=org"
-      PROVISION_BIND_PW:   "adminpass"
-      PROVISION_BASE:      "dc=example,dc=org"
-      PROVISION_PEOPLE_OU: "ou=People,dc=example,dc=org"
-      PROVISION_GROUPS_OU: "ou=Groups,dc=example,dc=org"
+      # into an AUXILIARY objectClass and breaks the LDIF we emit.
     ports:
       - "1389:389"
+      - "1636:636"
     volumes:
       - ./fixtures:/fixtures:ro
+      - tls-certs:/container/service/slapd/assets/certs
+    post_start:
+      - command: ["bash",    "/fixtures/openldap/setup.sh"]
+      - command: ["python3", "/fixtures/openldap/provision.py"]
+    healthcheck:
+      test: ["CMD-SHELL", "test -e /tmp/provisioned"]
+      interval: 5s
+      retries: 60
+      start_period: 30s
 
   samba:
     image: nowsci/samba-domain:latest
     container_name: pureldap-samba
     hostname: dc1
     # AD-DC needs to control its own hostname resolution
-    domainname: example.local
+    domainname: example.com
     privileged: true
+    depends_on:
+      tls-init:
+        condition: service_completed_successfully
     environment:
-      DOMAIN:         "EXAMPLE.LOCAL"
-      DOMAINPASS:     "Vagrantvagrantvagrant1"
+      DOMAIN:         "EXAMPLE.COM"
+      DOMAINPASS:     "Foo_b_ar123!"
       DOMAIN_NETBIOS: "EXAMPLE"
-      DOMAIN_EMAIL:   "admin@example.local"
+      DOMAIN_EMAIL:   "admin@example.com"
       DNSFORWARDER:   "1.1.1.1"
       HOSTIP:         "127.0.0.1"
       INSECURELDAP:   "true"
-      MULTISITE:      "false"
-      NOCOMPLEXITY:   "false"
-      DISABLE_DNS:    "false"
-
-      # Read by provision.py inside this container.
-      PROVISION_USERS_DN: "CN=Users,DC=example,DC=local"
     ports:
       - "7389:389"
       - "7636:636"
     volumes:
       - ./fixtures:/fixtures:ro
-
+      # Read-only mount — samba's first-boot domain provisioning
+      # writes its own cert into /var/lib/samba/private/tls/ and we
+      # don't want to fight it. setup.sh copies from here into the
+      # samba TLS dir after first boot.
+      - tls-certs:/certs:ro
+    post_start:
+      - command: ["bash",    "/fixtures/samba/setup.sh"]
+      - command: ["python3", "/fixtures/samba/provision.py"]
+    healthcheck:
+      test: ["CMD-SHELL", "test -e /tmp/provisioned"]
+      interval: 5s
+      retries: 120
+      start_period: 60s
