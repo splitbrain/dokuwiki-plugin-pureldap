@@ -44,9 +44,20 @@ jobs:
                 echo ::add-matcher::${{ runner.tool_cache }}/phpunit.json
 
             - name: Bring up fixtures
+              # Start the two LDAP services, then invoke the in-container
+              # provisioner for each. The script handles its own wait
+              # for the backend to become responsive, so 'up -d' (no
+              # --wait, no healthcheck) is enough — the script blocks
+              # until both backends are populated and exits non-zero
+              # on failure. (post_start lifecycle hooks would be a
+              # cleaner expression of this but require compose v2.30+
+              # and were silently misbehaving on this runner.)
               run: |
-                docker compose -f _test/docker-compose.yml up -d --wait
+                set -e
+                docker compose -f _test/docker-compose.yml up -d
                 docker compose -f _test/docker-compose.yml ps
+                docker exec pureldap-openldap python3 /fixtures/provision.py --backend openldap
+                docker exec pureldap-samba    python3 /fixtures/provision.py --backend samba
 
             - name: Create DokuWiki environment
               uses: dokuwiki/github-action/.github/actions/dokuenv@main
