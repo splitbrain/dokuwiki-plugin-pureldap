@@ -51,6 +51,16 @@ jobs:
             - name: Checkout
               uses: actions/checkout@v4
 
+            - name: Verify fixture artifacts are in sync with people.json
+              run: |
+                bash _test/fixtures/regenerate.sh
+                if ! git diff --exit-code \
+                        _test/fixtures/openldap/bootstrap.ldif \
+                        _test/fixtures/samba/provision-data.sh; then
+                    echo "::error::Generated fixture artifacts are stale. Run _test/fixtures/regenerate.sh and commit the result."
+                    exit 1
+                fi
+
             - name: Setup PHP
               uses: shivammathur/setup-php@v2
               with:

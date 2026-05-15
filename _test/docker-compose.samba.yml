@@ -35,3 +35,4 @@ services:
       - "7636:636"
     volumes:
       - ./fixtures/samba/provision-fixture.sh:/provision-fixture.sh:ro
+      - ./fixtures/samba/provision-data.sh:/provision-data.sh:ro

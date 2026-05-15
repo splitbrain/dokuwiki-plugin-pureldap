@@ -6,3 +6,4 @@ vendor/freedsx/socket/tests
 vendor/**/*.yml
 vendor/**/*.dist
 vendor/freedsx/sasl/docs
+_test/fixtures/__pycache__/
