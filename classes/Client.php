@@ -5,8 +5,8 @@ namespace dokuwiki\plugin\pureldap\classes;
 use dokuwiki\ErrorHandler;
 use dokuwiki\Logger;
 use dokuwiki\Utf8\Clean;
-use dokuwiki\Utf8\PhpString;
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -75,9 +75,6 @@ abstract class Client
         } elseif ($config['validate'] === 'self') {
             $config['ssl_allow_self_signed'] = true;
         }
-
-        $config['suffix'] = ltrim(PhpString::strtolower($config['suffix']), '@');
-        $config['primarygroup'] = $this->cleanGroup($config['primarygroup']);
 
         return $config;
     }
@@ -247,14 +244,123 @@ abstract class Client
     abstract public function getUser($username, $fetchgroups = true);
 
     /**
+     * Fetch the raw LDAP entry for a user
+     *
+     * @param string $username
+     * @return Entry|null
+     */
+    abstract public function getUserEntry($username);
+
+    /**
+     * Name of the LDAP attribute that holds the user password.
+     *
+     * @return string
+     */
+    abstract protected function passwordAttribute();
+
+    /**
+     * Encode a plain text password for transmission to the LDAP server.
+     *
+     * @param string $password
+     * @return string
+     */
+    abstract protected function encodePassword($password);
+
+    /**
      * Set a new password for a user
+     *
+     * Template method: looks up the user entry, optionally re-binds as the
+     * user for self-service changes, and delegates the actual attribute
+     * modification to {@see applyPasswordChange()}.
      *
      * @param string $username
      * @param string $newpass
-     * @param string $oldpass Needed for self-service password change in AD
+     * @param string|null $oldpass Needed for self-service password change in AD
      * @return bool
      */
-    abstract public function setPassword($username, $newpass, $oldpass = null);
+    public function setPassword($username, $newpass, $oldpass = null)
+    {
+        if (!$this->autoAuth()) return false;
+
+        $entry = $this->getUserEntry($username);
+        if ($entry === null) {
+            $this->error("User '$username' not found", __FILE__, __LINE__);
+            return false;
+        }
+
+        if ($oldpass) {
+            // self-service password change: bind as the user themselves
+            if ($this->isAuthenticated !== $this->prepareBindUser($username)) {
+                try {
+                    $this->authenticate($username, $oldpass);
+                } catch (\Exception $e) {
+                    $this->error("Old password for '$username' is wrong", __FILE__, __LINE__);
+                    return false;
+                }
+            }
+        }
+
+        $this->applyPasswordChange($entry, $newpass, $oldpass);
+
+        try {
+            $this->ldap->update($entry);
+        } catch (OperationException $e) {
+            $this->fatal($e);
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Apply the password change to the user entry.
+     *
+     * Default implementation does a simple attribute replace. Subclasses with
+     * protocol-specific requirements (e.g. Active Directory's mandatory
+     * delete-then-add dance for self-service changes) override this.
+     *
+     * @param Entry $entry
+     * @param string $newpass
+     * @param string|null $oldpass
+     * @return void
+     */
+    protected function applyPasswordChange(Entry $entry, $newpass, $oldpass)
+    {
+        $entry->set($this->passwordAttribute(), $this->encodePassword($newpass));
+    }
+
+    /**
+     * Translate a bind exception into a localisable user-facing message.
+     *
+     * @param \Exception $e
+     * @return array|null Either null when no translation is available, or an
+     *                   array with keys 'key' (language string key) and
+     *                   'allowReset' (whether to offer a password reset link).
+     */
+    public function translateBindException(\Exception $e)
+    {
+        return null;
+    }
+
+    /**
+     * Whether this client supports changing user passwords with the current
+     * configuration. Drives the auth plugin's modPass capability flag.
+     *
+     * @return bool
+     */
+    public function canModPass()
+    {
+        return false;
+    }
+
+    /**
+     * Whether this client can report password expiry information.
+     *
+     * @return bool
+     */
+    public function supportsPasswordExpiry()
+    {
+        return false;
+    }
 
     /**
      * Return a list of all available groups, use cache if available

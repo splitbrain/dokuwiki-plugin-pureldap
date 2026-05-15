@@ -1,8 +1,8 @@
 <?php
 
 use dokuwiki\Extension\AuthPlugin;
-use dokuwiki\plugin\pureldap\classes\ADClient;
 use dokuwiki\plugin\pureldap\classes\Client;
+use dokuwiki\plugin\pureldap\classes\ClientFactory;
 
 /**
  * DokuWiki Plugin pureldap (Auth Component)
@@ -28,17 +28,13 @@ class auth_plugin_pureldap extends AuthPlugin
         $this->conf['admin_password'] = conf_decodeString($this->conf['admin_password']);
         $this->conf['defaultgroup'] = $conf['defaultgroup'];
 
-        $this->client = new ADClient($this->conf); // FIXME decide class on config
+        $this->client = ClientFactory::create($this->conf);
 
         // set capabilities
         $this->cando['getUsers'] = true;
         $this->cando['getGroups'] = true;
         $this->cando['logout'] = !$this->client->getConf('sso');
-        if ($this->client->getConf('encryption') !== 'none') {
-            // with encryption passwords can be changed
-            // for resetting passwords a privileged user is needed
-            $this->cando['modPass'] = true;
-        }
+        $this->cando['modPass'] = $this->client->canModPass();
 
 
         $this->success = true;
@@ -59,12 +55,12 @@ class auth_plugin_pureldap extends AuthPlugin
         }
 
         // try to bind with the user credentials, client will stay authenticated as user
-        $this->client = new ADClient($this->conf); // FIXME decide class on config
+        $this->client = ClientFactory::create($this->conf);
         try {
             $this->client->authenticate($user, $pass);
             return true;
         } catch (\Exception $e) {
-            $this->parseErrorCodesToMessages($e);
+            $this->renderBindError($e);
             return false;
         }
     }
@@ -137,44 +133,25 @@ class auth_plugin_pureldap extends AuthPlugin
     }
 
     /**
-     * Parse error codes from LDAP exceptions and output them as user-friendly messages.
+     * Ask the client to translate a bind exception and render the resulting
+     * message (with an optional password-reset link).
      *
-     * This is currently tailored for Active Directory bind errors.
-     *
-     * @param Exception $e
+     * @param \Exception $e
      * @return void
      */
-    public function parseErrorCodesToMessages(\Exception $e)
+    protected function renderBindError(\Exception $e)
     {
-        // See https://ldapwiki.com/wiki/Wiki.jsp?page=Common%20Active%20Directory%20Bind%20Errors
-        $bind_errors = [
-            '52f' => 'ERROR_ACCOUNT_RESTRICTION',
-            '530' => 'ERROR_INVALID_LOGON_HOURS',
-            '531' => 'ERROR_INVALID_WORKSTATION',
-            '532' => 'ERROR_PASSWORD_EXPIRED',
-            '533' => 'ERROR_ACCOUNT_DISABLED',
-            '701' => 'ERROR_ACCOUNT_EXPIRED',
-            '773' => 'ERROR_PASSWORD_MUST_CHANGE',
-        ];
+        $info = $this->client->translateBindException($e);
+        if ($info === null) return;
 
-        if (
-            $e instanceof \FreeDSx\Ldap\Exception\BindException &&
-            $e->getCode() === 49 &&
-            preg_match('/ data ([0-9a-f]{3})/', $e->getMessage(), $matches)
-        ) {
-            $code = $matches[1];
-            if (isset($bind_errors[$code])) {
-                $message = $this->getLang($bind_errors[$code]) ?: $bind_errors[$code];
+        $message = $this->getLang($info['key']) ?: $info['key'];
 
-                // on password expired or must change, add reset hint
-                if ($this->canDo('modPass') && ($code == 532 || $code == 773)) {
-                    $link = '<a href="' . wl('start', ['do' => 'resendpwd']) . '" class="pureldap-reset-link">' .
-                        $this->getLang('pass_reset') . '</a>';
-                    $message .= ' ' . $link;
-                }
-
-                msg($message, -1);
-            }
+        if (!empty($info['allowReset']) && $this->canDo('modPass')) {
+            $link = '<a href="' . wl('start', ['do' => 'resendpwd']) . '" class="pureldap-reset-link">' .
+                $this->getLang('pass_reset') . '</a>';
+            $message .= ' ' . $link;
         }
+
+        msg($message, -1);
     }
 }

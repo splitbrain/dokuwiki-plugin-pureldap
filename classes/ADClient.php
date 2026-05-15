@@ -6,6 +6,7 @@ use dokuwiki\Utf8\PhpString;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
@@ -24,6 +25,15 @@ class ADClient extends Client
     protected $gch;
 
     /** @inheritDoc */
+    protected function prepareConfig($config)
+    {
+        $config = parent::prepareConfig($config);
+        $config['suffix'] = ltrim(PhpString::strtolower($config['suffix']), '@');
+        $config['primarygroup'] = $this->cleanGroup($config['primarygroup']);
+        return $config;
+    }
+
+    /** @inheritDoc */
     public function getUser($username, $fetchgroups = true)
     {
         $entry = $this->getUserEntry($username);
@@ -31,13 +41,8 @@ class ADClient extends Client
         return $this->entry2User($entry);
     }
 
-    /**
-     * Get the LDAP entry for the given user
-     *
-     * @param string $username
-     * @return Entry|null
-     */
-    protected function getUserEntry($username)
+    /** @inheritDoc */
+    public function getUserEntry($username)
     {
         if (!$this->autoAuth()) return null;
         $samaccountname = $this->simpleUser($username);
@@ -65,42 +70,77 @@ class ADClient extends Client
     }
 
     /** @inheritDoc */
-    public function setPassword($username, $newpass, $oldpass = null)
+    protected function passwordAttribute()
     {
-        if (!$this->autoAuth()) return false;
+        return 'unicodePwd';
+    }
 
-        $entry = $this->getUserEntry($username);
-        if ($entry === null) {
-            $this->error("User '$username' not found", __FILE__, __LINE__);
-            return false;
-        }
-
+    /**
+     * AD requires a delete-then-add modify for self-service password changes;
+     * a simple replace only works when acting as a privileged admin.
+     *
+     * @inheritDoc
+     */
+    protected function applyPasswordChange(Entry $entry, $newpass, $oldpass)
+    {
+        $attr = $this->passwordAttribute();
         if ($oldpass) {
-            // if an old password is given, this is a self-service password change
-            // this has to be executed as the user themselves, not as the admin
-            if ($this->isAuthenticated !== $this->prepareBindUser($username)) {
-                try {
-                    $this->authenticate($username, $oldpass);
-                } catch (\Exception $e) {
-                    $this->error("Old password for '$username' is wrong", __FILE__, __LINE__);
-                    return false;
-                }
-            }
-
-            $entry->remove('unicodePwd', $this->encodePassword($oldpass));
-            $entry->add('unicodePwd', $this->encodePassword($newpass));
+            $entry->remove($attr, $this->encodePassword($oldpass));
+            $entry->add($attr, $this->encodePassword($newpass));
         } else {
-            // run as admin user
-            $entry->set('unicodePwd', $this->encodePassword($newpass));
+            $entry->set($attr, $this->encodePassword($newpass));
+        }
+    }
+
+    /** @inheritDoc */
+    public function canModPass()
+    {
+        return $this->config['encryption'] !== 'none';
+    }
+
+    /** @inheritDoc */
+    public function supportsPasswordExpiry()
+    {
+        return true;
+    }
+
+    /**
+     * Translate Active Directory bind error sub-codes into a localisable
+     * message key.
+     *
+     * AD encodes specific failure reasons (account disabled, password
+     * expired, etc.) in the bind error text as "data XXX". See
+     * https://ldapwiki.com/wiki/Wiki.jsp?page=Common%20Active%20Directory%20Bind%20Errors
+     *
+     * @inheritDoc
+     */
+    public function translateBindException(\Exception $e)
+    {
+        $bindErrors = [
+            '52f' => 'ERROR_ACCOUNT_RESTRICTION',
+            '530' => 'ERROR_INVALID_LOGON_HOURS',
+            '531' => 'ERROR_INVALID_WORKSTATION',
+            '532' => 'ERROR_PASSWORD_EXPIRED',
+            '533' => 'ERROR_ACCOUNT_DISABLED',
+            '701' => 'ERROR_ACCOUNT_EXPIRED',
+            '773' => 'ERROR_PASSWORD_MUST_CHANGE',
+        ];
+
+        if (
+            !($e instanceof BindException) ||
+            $e->getCode() !== 49 ||
+            !preg_match('/ data ([0-9a-f]{3})/', $e->getMessage(), $matches)
+        ) {
+            return null;
         }
 
-        try {
-            $this->ldap->update($entry);
-        } catch (OperationException $e) {
-            $this->fatal($e);
-            return false;
-        }
-        return true;
+        $code = $matches[1];
+        if (!isset($bindErrors[$code])) return null;
+
+        return [
+            'key' => $bindErrors[$code],
+            'allowReset' => $code === '532' || $code === '773',
+        ];
     }
 
     /** @inheritDoc */
