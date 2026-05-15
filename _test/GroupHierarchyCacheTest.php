@@ -6,6 +6,8 @@ use dokuwiki\plugin\pureldap\classes\ADClient;
 use dokuwiki\plugin\pureldap\classes\GroupHierarchyCache;
 use DokuWikiTest;
 
+require_once __DIR__ . '/RequiresAD.php';
+
 /**
  * tests for the pureldap plugin
  *
@@ -14,6 +16,13 @@ use DokuWikiTest;
  */
 class GroupHierarchyCacheTest extends DokuWikiTest
 {
+    use RequiresAD;
+
+    public function setUp(): void
+    {
+        $this->skipIfNoAD('localhost', 7636);
+        parent::setUp();
+    }
 
     /**
      * Return an initialized GroupHierarchyCache

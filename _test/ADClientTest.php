@@ -4,6 +4,8 @@ namespace dokuwiki\plugin\pureldap\test;
 
 use dokuwiki\plugin\pureldap\classes\ADClient;
 
+require_once __DIR__ . '/RequiresAD.php';
+
 /**
  * General tests for the pureldap plugin
  *
@@ -12,6 +14,14 @@ use dokuwiki\plugin\pureldap\classes\ADClient;
  */
 class ADClientTest extends \DokuWikiTest
 {
+    use RequiresAD;
+
+    public function setUp(): void
+    {
+        $this->skipIfNoAD();
+        parent::setUp();
+    }
+
     /**
      * Create a client with default settings
      *

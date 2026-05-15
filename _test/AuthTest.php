@@ -2,14 +2,19 @@
 
 namespace dokuwiki\plugin\pureldap\test;
 
+require_once __DIR__ . '/RequiresAD.php';
+
 /**
  * @group plugin_pureldap
  * @group plugins
  */
 class AuthTest extends \DokuWikiTest {
 
+    use RequiresAD;
+
     public function setUp(): void
     {
+        $this->skipIfNoAD('localhost', 7636);
         parent::setUp();
 
         global $conf;
