@@ -1,79 +1,44 @@
 {
-  "_comment": "Source of truth for integration fixtures. Applied by provision.php which shells out to ldapadd (openldap) and samba-tool/ldbmodify via docker exec (samba). Each entity lists the backends it should land on; backend-specific extras live under per-backend keys.",
-
-  "domains": {
-    "openldap": {
-      "host":      "openldap",
-      "port":      389,
-      "bind_dn":   "cn=admin,dc=example,dc=org",
-      "bind_pw":   "adminpass",
-      "base":      "dc=example,dc=org",
-      "people_ou": "ou=People,dc=example,dc=org",
-      "groups_ou": "ou=Groups,dc=example,dc=org",
-      "probe_user": "alice"
-    },
-    "samba": {
-      "container":  "pureldap-samba",
-      "base":       "DC=example,DC=local",
-      "users_dn":   "CN=Users,DC=example,DC=local",
-      "ldb_path":   "/var/lib/samba/private/sam.ldb",
-      "probe_user": "a.legrand"
-    }
-  },
-
-  "password_policy": {
-    "samba": { "max_pwd_age_days": 42 }
-  },
+  "_comment": "Single source of truth for both LDAP integration fixtures. Same data goes to both backends — no per-backend tags, no connection info (set via env vars on the provisioner service in docker-compose.yml).",
 
   "groups": [
-    { "name": "devs",          "backends": ["openldap"], "openldap": { "gid": 5001 } },
-    { "name": "ops",           "backends": ["openldap"], "openldap": { "gid": 5002 } },
-    { "name": "admins",        "backends": ["openldap"], "openldap": { "gid": 5003 } },
-
-    { "name": "alpha",         "backends": ["samba"] },
-    { "name": "beta",          "backends": ["samba"], "samba": { "memberGroups": ["Gamma Nested"] } },
-    { "name": "Gamma Nested",  "backends": ["samba"] }
+    { "name": "admins" },
+    { "name": "devs" },
+    { "name": "ops" },
+    { "name": "alpha" },
+    { "name": "beta",         "contains": ["Gamma Nested"] },
+    { "name": "Gamma Nested" }
   ],
 
   "users": [
     {
-      "uid":         "alice",
-      "backends":    ["openldap"],
-      "givenName":   "Alice",
-      "sn":          "Example",
-      "cn":          "Alice Example",
-      "mail":        "alice@example.org",
-      "password":    "password",
-      "memberOf":    ["devs", "admins"],
-      "openldap":    { "uidNumber": 1001, "gidNumber": 5001, "homeDirectory": "/home/alice" }
+      "uid":       "alice",
+      "givenName": "Alice",
+      "sn":        "Example",
+      "mail":      "alice@example.org",
+      "password":  "password",
+      "memberOf":  ["admins", "devs"]
     },
     {
-      "uid":         "bob",
-      "backends":    ["openldap"],
-      "givenName":   "Bob",
-      "sn":          "Example",
-      "cn":          "Bob Example",
-      "mail":        "bob@example.org",
-      "password":    "password",
-      "memberOf":    ["devs", "ops"],
-      "openldap":    { "uidNumber": 1002, "gidNumber": 5002, "homeDirectory": "/home/bob" }
+      "uid":       "bob",
+      "givenName": "Bob",
+      "sn":        "Example",
+      "mail":      "bob@example.org",
+      "password":  "password",
+      "memberOf":  ["devs", "ops"]
     },
-
     {
       "uid":       "a.legrand",
-      "backends":  ["samba"],
       "givenName": "Amerigo",
       "sn":        "Legrand",
       "mail":      "a.legrand@example.com",
       "mobile":    "+63 (483) 526-8809",
       "password":  "Foo_b_ar123!",
-      "memberOf":  ["beta", "Gamma Nested"],
-      "_comment":  "DONT_EXPIRE_PASSWD bit set so ADClientTest::testGetUser sees expires=false (NORMAL_ACCOUNT 512 | DONT_EXPIRE_PASSWD 65536 = 66048)",
-      "samba":     { "userAccountControl": 66048 }
+      "passwordNeverExpires": true,
+      "memberOf":  ["beta", "Gamma Nested"]
     },
     {
       "uid":       "a.blaskett",
-      "backends":  ["samba"],
       "givenName": "Allene",
       "sn":        "Blaskett",
       "mail":      "a.blaskett@example.com",
@@ -82,8 +47,7 @@
     },
     {
       "uid":       "andras.k",
-      "backends":  ["samba"],
-      "_comment":  "testGetFilteredUsers asserts STARTSWITH match on givenName 'Andras'",
+      "_comment":  "givenName starts with 'Andras' — testGetFilteredUsers asserts STARTSWITH match",
       "givenName": "Andras",
       "sn":        "Kovac",
       "mail":      "andras.k@example.com",
@@ -92,7 +56,6 @@
     },
     {
       "uid":       "m.albro",
-      "backends":  ["samba"],
       "givenName": "Maire",
       "sn":        "Albro",
       "mail":      "m.albro@example.com",
@@ -101,7 +64,6 @@
     },
     {
       "uid":       "m.mcnevin",
-      "backends":  ["samba"],
       "givenName": "Mike",
       "sn":        "McNevin",
       "mail":      "m.mcnevin@example.com",
@@ -110,7 +72,6 @@
     },
     {
       "uid":       "x.guiu",
-      "backends":  ["samba"],
       "givenName": "Xanthus",
       "sn":        "Guiu",
       "mail":      "x.guiu@example.com",
@@ -118,7 +79,6 @@
     },
     {
       "uid":       "averylongusernamethatisverylong",
-      "backends":  ["samba"],
       "givenName": "Long",
       "sn":        "Username",
       "mail":      "long@example.com",
@@ -127,8 +87,7 @@
   ],
 
   "padding": {
-    "backends":         ["samba"],
-    "_comment":         "Bulk filler users so count assertions pass: Domain Users > 250, alpha in [20,150). First 28 go into alpha; rest are unaffiliated.",
+    "_comment":         "Bulk users so AD count assertions pass: Domain Users > 250, alpha in [20,150). First 28 land in alpha.",
     "count":            260,
     "uid_format":       "p.user%03d",
     "givenName_format": "P%d",
@@ -137,5 +96,9 @@
     "memberships":      [
       { "group": "alpha", "first_n": 28 }
     ]
+  },
+
+  "password_policy": {
+    "max_pwd_age_days": 42
   }
 }

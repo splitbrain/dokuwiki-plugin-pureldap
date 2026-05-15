@@ -1,10 +1,9 @@
 name: Integration tests
 
-# One workflow, one matrix, one provisioning entry point.
-# Each fixture target points at a compose file and a backend name; the
-# rest of the pipeline is identical. Adding a new target means a new
-# compose file, a new matrix row, and a new backend handler in
-# _test/fixtures/provision.php.
+# Single job. `docker compose run --rm provisioner` brings up both LDAP
+# backends and applies users.json to each via the OO provisioner. After
+# it exits, phpunit runs the openldap-targeted suite against localhost:1389
+# and the AD-targeted suite against localhost:7389.
 
 on: [push, pull_request]
 
@@ -14,7 +13,7 @@ concurrency:
 
 jobs:
     integration:
-        name: ${{ matrix.fixture.label }} (PHP ${{ matrix.php-version }}, DokuWiki ${{ matrix.dokuwiki-branch }})
+        name: Integration (PHP ${{ matrix.php-version }}, DokuWiki ${{ matrix.dokuwiki-branch }})
         runs-on: ubuntu-latest
         if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
 
@@ -23,21 +22,6 @@ jobs:
             matrix:
                 php-version: ['8.2']
                 dokuwiki-branch: ['master']
-                fixture:
-                    - name: openldap
-                      label: OpenLDAP
-                      compose: _test/docker-compose.openldap.yml
-                      container: pureldap-openldap
-                      port: 1389
-                      phpunit_group: plugin_pureldap_integration
-                      phpunit_filter: ''
-                    - name: samba
-                      label: Samba AD-DC
-                      compose: _test/docker-compose.samba.yml
-                      container: pureldap-samba
-                      port: 7389
-                      phpunit_group: plugin_pureldap
-                      phpunit_filter: '/^(ADClientTest|AuthTest|GroupHierarchyCacheTest)::/'
 
         env:
             COMPOSER: _test/composer.json
@@ -58,16 +42,10 @@ jobs:
                 echo ::add-matcher::${{ runner.tool_cache }}/php.json
                 echo ::add-matcher::${{ runner.tool_cache }}/phpunit.json
 
-            - name: Start ${{ matrix.fixture.label }} fixture
-              # `compose run --rm` is the only invocation that gives a
-              # firm "the provisioner has exited successfully" signal:
-              # it starts dependencies (honouring depends_on service_healthy),
-              # runs the provisioner attached, and returns its exit code.
-              # `compose up --wait` returned too early on one-shot services,
-              # so phpunit was racing against still-provisioning fixtures.
+            - name: Bring up fixtures
               run: |
-                docker compose -f ${{ matrix.fixture.compose }} run --rm -T provisioner
-                docker compose -f ${{ matrix.fixture.compose }} ps
+                docker compose -f _test/docker-compose.yml run --rm -T provisioner
+                docker compose -f _test/docker-compose.yml ps
 
             - name: Create DokuWiki environment
               uses: dokuwiki/github-action/.github/actions/dokuenv@main
@@ -77,23 +55,20 @@ jobs:
             - name: Install composer dependencies
               run: composer install --no-progress --no-interaction --prefer-dist --optimize-autoloader --no-scripts
 
-            - name: Run phpunit
+            - name: Run OpenLDAP tests
               env:
                   LDAP_TEST_HOST: localhost
-                  LDAP_TEST_PORT: ${{ matrix.fixture.port }}
-                  PHPUNIT_GROUP: ${{ matrix.fixture.phpunit_group }}
-                  PHPUNIT_FILTER: ${{ matrix.fixture.phpunit_filter }}
-              run: |
-                if [ -n "$PHPUNIT_FILTER" ]; then
-                    composer exec -- phpunit -c _test/phpunit.xml --verbose --stderr \
-                        --group "$PHPUNIT_GROUP" --filter "$PHPUNIT_FILTER"
-                else
-                    composer exec -- phpunit -c _test/phpunit.xml --verbose --stderr \
-                        --group "$PHPUNIT_GROUP"
-                fi
+                  LDAP_TEST_PORT: 1389
+              run: composer exec -- phpunit -c _test/phpunit.xml --verbose --stderr --group plugin_pureldap_integration
+
+            - name: Run Samba AD tests
+              env:
+                  LDAP_TEST_HOST: localhost
+                  LDAP_TEST_PORT: 7389
+              run: composer exec -- phpunit -c _test/phpunit.xml --verbose --stderr --group plugin_pureldap --filter '/^(ADClientTest|AuthTest|GroupHierarchyCacheTest)::/'
 
             - name: Dump fixture logs on failure
               if: failure()
               run: |
-                docker compose -f ${{ matrix.fixture.compose }} ps -a
-                docker compose -f ${{ matrix.fixture.compose }} logs --tail=300 || true
+                docker compose -f _test/docker-compose.yml ps -a
+                docker compose -f _test/docker-compose.yml logs --tail=300 || true

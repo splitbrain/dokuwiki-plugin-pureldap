@@ -2,454 +2,444 @@
 <?php
 
 /**
- * Apply the shared fixture spec (users.json) to one LDAP backend.
+ * Apply users.json to both LDAP backends.
  *
- *   php provision.php --backend openldap
- *   php provision.php --backend samba
+ * Three classes:
+ *   Provisioner          — abstract base. Driver loop and shared helpers.
+ *   OpenLDAPProvisioner  — implements the per-entity methods via ldapadd /
+ *                          ldapmodify against the openldap service.
+ *   SambaProvisioner     — implements them via docker-exec → samba-tool /
+ *                          ldbmodify against the samba container.
  *
- * Same control flow either way:
+ * The spec is plain data — no backend tags, no connection info, no
+ * per-backend conditions. Each subclass reads its own connection
+ * settings from environment variables (set on the provisioner service
+ * in docker-compose.yml) and decides how to express the spec's fields
+ * against its backend (e.g. posixAccount uidNumber is auto-assigned;
+ * passwordNeverExpires becomes a userAccountControl override on AD
+ * and a no-op on slapd).
  *
- *     foreach ($groups as $g)      addGroup($g, $backend);
- *     foreach ($users as $u)       addUser($u, $backend);
- *     foreach ($memberships as $m) addMembership($m, $backend);
- *
- * The per-entity backend handlers shell out to native CLI tools — never
- * to a PHP LDAP client. That keeps the test data path independent of
- * FreeDSx, which is the library we're actually testing.
- *
- *   openldap →  ldapadd / ldapmodify  (over LDAP from the host)
- *   samba    →  docker exec → samba-tool / ldbmodify  (on the local sam.ldb)
- *
- * The TLS-cert regen for Samba happens at the end via the small in-
- * container script mounted by docker-compose.samba.yml.
- *
- * The script is idempotent: if the canonical probe user already exists,
- * it exits without doing work, so a re-invocation against a populated
- * container is a no-op.
+ * Both run() invocations are idempotent: each backend probes for the
+ * canonical 'alice' entry and short-circuits if she's already there,
+ * so re-running this script against a populated fixture is a no-op.
  */
 
 const SPEC_PATH = __DIR__ . '/users.json';
 
-// ---------------------------------------------------------------------------
-// CLI
-// ---------------------------------------------------------------------------
-
-$opts = getopt('', ['backend:', 'spec::', 'force']);
-$backend = $opts['backend'] ?? null;
-if (!in_array($backend, ['openldap', 'samba'], true)) {
-    fwrite(STDERR, "Usage: provision.php --backend openldap|samba [--spec path] [--force]\n");
-    exit(2);
-}
-$specPath = $opts['spec'] ?? SPEC_PATH;
-$force    = isset($opts['force']);
-
-$spec = json_decode(file_get_contents($specPath), true, 512, JSON_THROW_ON_ERROR);
-$spec = stripCommentKeys($spec);
-$ctx  = $spec['domains'][$backend];
-
-// ---------------------------------------------------------------------------
-// Driver
-// ---------------------------------------------------------------------------
-
-waitForBackend($backend, $ctx);
-
-if (!$force && probeUser($ctx['probe_user'], $backend, $ctx)) {
-    echo "Fixture already provisioned ({$ctx['probe_user']} present). Skipping.\n";
-    exit(0);
-}
-
-if ($backend === 'openldap') {
-    // osixia/openldap creates the dc=… root from env vars but no sub-OUs.
-    // The first user/group add would fail with "no such object" against
-    // an absent parent, so seed the containers we declared in the spec.
-    ensureContainer($ctx['people_ou'], $ctx);
-    ensureContainer($ctx['groups_ou'], $ctx);
-}
-
-if (isset($spec['password_policy'][$backend])) {
-    applyPasswordPolicy($spec['password_policy'][$backend], $backend, $ctx);
-}
-
-foreach (forBackend($spec['groups'], $backend) as $g) {
-    addGroup($g, $backend, $ctx);
-}
-foreach (forBackend($spec['groups'], $backend) as $g) {
-    foreach ($g[$backend]['memberGroups'] ?? [] as $inner) {
-        addGroupToGroup($g['name'], $inner, $backend, $ctx);
-    }
-}
-foreach (forBackend($spec['users'], $backend) as $u) {
-    addUser($u, $backend, $ctx);
-}
-foreach (forBackend($spec['users'], $backend) as $u) {
-    foreach ($u['memberOf'] ?? [] as $group) {
-        addUserToGroup($u['uid'], $group, $backend, $ctx);
-    }
-}
-
-if (isset($spec['padding']) && in_array($backend, $spec['padding']['backends'], true)) {
-    addPaddingUsers($spec['padding'], $backend, $ctx);
-}
-
-if ($backend === 'samba') {
-    echo "Regenerating Samba TLS cert with localhost SAN...\n";
-    runDockerExec($ctx['container'], ['/regen-tls.sh']);
-}
-
-verify($backend, $ctx);
-echo "Provisioning complete: $backend\n";
-
-// ---------------------------------------------------------------------------
-// Per-entity dispatch
-// ---------------------------------------------------------------------------
-
-function addGroup(array $g, string $backend, array $ctx): void
+abstract class Provisioner
 {
-    echo "  + group  {$g['name']}\n";
-    if ($backend === 'openldap') {
-        $ldif = "dn: cn={$g['name']},{$ctx['groups_ou']}\n"
-              . "objectClass: posixGroup\n"
-              . "cn: {$g['name']}\n"
-              . "gidNumber: {$g['openldap']['gid']}\n";
-        ldapAdd($ldif, $ctx);
-    } else {
-        runDockerExec($ctx['container'], ['samba-tool', 'group', 'add', $g['name']]);
+    protected array $spec;
+
+    public function __construct(array $spec)
+    {
+        $this->spec = $spec;
+    }
+
+    public function run(): void
+    {
+        $name = (new ReflectionClass($this))->getShortName();
+        if ($this->isAlreadyProvisioned()) {
+            echo "[{$name}] already provisioned, skipping\n";
+            return;
+        }
+        echo "[{$name}] provisioning...\n";
+
+        $this->ensureRoot();
+        $this->applyPasswordPolicy();
+
+        foreach ($this->spec['groups'] as $g) {
+            $this->addGroup($g);
+        }
+        foreach ($this->spec['groups'] as $g) {
+            foreach ($g['contains'] ?? [] as $inner) {
+                $this->addGroupToGroup($g['name'], $inner);
+            }
+        }
+        foreach ($this->spec['users'] as $u) {
+            $this->addUser($u);
+        }
+        foreach ($this->spec['users'] as $u) {
+            foreach ($u['memberOf'] ?? [] as $group) {
+                $this->addUserToGroup($u['uid'], $group);
+            }
+        }
+        if (isset($this->spec['padding'])) {
+            $this->addPaddingUsers($this->spec['padding']);
+        }
+        $this->finalize();
+        echo "[{$name}] done\n";
+    }
+
+    abstract protected function isAlreadyProvisioned(): bool;
+    abstract protected function ensureRoot(): void;
+    abstract protected function applyPasswordPolicy(): void;
+    abstract protected function addGroup(array $g): void;
+    abstract protected function addUser(array $u): void;
+    abstract protected function addUserToGroup(string $uid, string $group): void;
+    abstract protected function addGroupToGroup(string $outer, string $inner): void;
+    abstract protected function addPaddingUsers(array $padding): void;
+    abstract protected function finalize(): void;
+
+    protected function env(string $key): string
+    {
+        $v = getenv($key);
+        if ($v === false || $v === '') {
+            throw new RuntimeException("Missing required env var: {$key}");
+        }
+        return $v;
+    }
+
+    protected function runCmd(array $cmd, ?string $stdin = null): string
+    {
+        $proc = proc_open($cmd, [
+            0 => $stdin !== null ? ['pipe', 'r'] : ['file', '/dev/null', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ], $pipes);
+        if (!is_resource($proc)) {
+            throw new RuntimeException('proc_open failed: ' . implode(' ', $cmd));
+        }
+        if ($stdin !== null) {
+            fwrite($pipes[0], $stdin);
+            fclose($pipes[0]);
+        }
+        $out = stream_get_contents($pipes[1]);
+        $err = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $code = proc_close($proc);
+        if ($code !== 0) {
+            fwrite(STDERR, "\nCommand failed (exit {$code}): " . implode(' ', $cmd) . "\n");
+            if ($stdin !== null) fwrite(STDERR, "stdin:\n{$stdin}\n");
+            if ($out !== '')     fwrite(STDERR, "stdout:\n{$out}\n");
+            if ($err !== '')     fwrite(STDERR, "stderr:\n{$err}\n");
+            exit(1);
+        }
+        return $out;
+    }
+
+    protected function runCmdStatus(array $cmd): int
+    {
+        $proc = proc_open($cmd, [
+            0 => ['file', '/dev/null', 'r'],
+            1 => ['file', '/dev/null', 'w'],
+            2 => ['file', '/dev/null', 'w'],
+        ], $pipes);
+        return is_resource($proc) ? proc_close($proc) : 1;
     }
 }
 
-function addUser(array $u, string $backend, array $ctx): void
+
+class OpenLDAPProvisioner extends Provisioner
 {
-    echo "  + user   {$u['uid']}\n";
-    if ($backend === 'openldap') {
-        $cn = $u['cn'] ?? "{$u['givenName']} {$u['sn']}";
-        $ldif  = "dn: uid={$u['uid']},{$ctx['people_ou']}\n";
+    private string $host;
+    private int    $port;
+    private string $bindDn;
+    private string $bindPw;
+    private string $peopleOu;
+    private string $groupsOu;
+    private int    $nextUidNumber = 1000;
+    private int    $nextGidNumber = 5000;
+
+    public function __construct(array $spec)
+    {
+        parent::__construct($spec);
+        $this->host     = $this->env('OPENLDAP_HOST');
+        $this->port     = (int) $this->env('OPENLDAP_PORT');
+        $this->bindDn   = $this->env('OPENLDAP_BIND_DN');
+        $this->bindPw   = $this->env('OPENLDAP_BIND_PW');
+        $this->peopleOu = $this->env('OPENLDAP_PEOPLE_OU');
+        $this->groupsOu = $this->env('OPENLDAP_GROUPS_OU');
+    }
+
+    protected function isAlreadyProvisioned(): bool
+    {
+        return $this->entryExists("uid=alice,{$this->peopleOu}");
+    }
+
+    protected function ensureRoot(): void
+    {
+        // osixia/openldap creates the dc=… root from LDAP_DOMAIN but no
+        // sub-OUs; seed the two we plant entries under.
+        foreach ([$this->peopleOu, $this->groupsOu] as $dn) {
+            if ($this->entryExists($dn)) continue;
+            [$attr, $val] = explode('=', explode(',', $dn, 2)[0], 2);
+            $this->ldapAdd("dn: {$dn}\nobjectClass: organizationalUnit\n{$attr}: {$val}\n");
+        }
+    }
+
+    protected function applyPasswordPolicy(): void
+    {
+        // Not modelled for slapd in this fixture.
+    }
+
+    protected function addGroup(array $g): void
+    {
+        $gid = ++$this->nextGidNumber;
+        echo "  + group {$g['name']}\n";
+        $this->ldapAdd(
+            "dn: cn={$g['name']},{$this->groupsOu}\n"
+            . "objectClass: posixGroup\n"
+            . "cn: {$g['name']}\n"
+            . "gidNumber: {$gid}\n"
+        );
+    }
+
+    protected function addUser(array $u): void
+    {
+        $uidNumber = ++$this->nextUidNumber;
+        $cn = "{$u['givenName']} {$u['sn']}";
+        $ldif  = "dn: uid={$u['uid']},{$this->peopleOu}\n";
         $ldif .= "objectClass: inetOrgPerson\n";
         $ldif .= "objectClass: posixAccount\n";
         $ldif .= "uid: {$u['uid']}\n";
         $ldif .= "cn: {$cn}\n";
         $ldif .= "sn: {$u['sn']}\n";
-        $ldif .= "mail: {$u['mail']}\n";
-        $ldif .= "uidNumber: {$u['openldap']['uidNumber']}\n";
-        $ldif .= "gidNumber: {$u['openldap']['gidNumber']}\n";
-        $ldif .= "homeDirectory: {$u['openldap']['homeDirectory']}\n";
-        $ldif .= 'userPassword: ' . sshaHash($u['password']) . "\n";
-        if (isset($u['mobile'])) {
-            $ldif .= "mobile: {$u['mobile']}\n";
-        }
-        ldapAdd($ldif, $ctx);
-        return;
+        $ldif .= "givenName: {$u['givenName']}\n";
+        if (isset($u['mail']))   $ldif .= "mail: {$u['mail']}\n";
+        if (isset($u['mobile'])) $ldif .= "mobile: {$u['mobile']}\n";
+        $ldif .= "uidNumber: {$uidNumber}\n";
+        $ldif .= "gidNumber: {$uidNumber}\n";
+        $ldif .= "homeDirectory: /home/{$u['uid']}\n";
+        $ldif .= 'userPassword: ' . $this->sshaHash($u['password']) . "\n";
+        echo "  + user {$u['uid']}\n";
+        $this->ldapAdd($ldif);
     }
 
-    $cmd = [
-        'samba-tool', 'user', 'create', $u['uid'], $u['password'],
-        '--given-name=' . $u['givenName'],
-        '--surname='    . $u['sn'],
-        '--use-username-as-cn',
-    ];
-    if (isset($u['mail'])) {
-        $cmd[] = '--mail-address=' . $u['mail'];
+    protected function addUserToGroup(string $uid, string $group): void
+    {
+        $this->ldapModify(
+            "dn: cn={$group},{$this->groupsOu}\n"
+            . "changetype: modify\n"
+            . "add: memberUid\n"
+            . "memberUid: {$uid}\n"
+        );
     }
-    runDockerExec($ctx['container'], $cmd);
 
-    $dn = "CN={$u['uid']},{$ctx['users_dn']}";
-    $attrs = ['displayName' => $u['cn'] ?? "{$u['givenName']} {$u['sn']}"];
-    if (isset($u['mobile'])) {
-        $attrs['mobile'] = $u['mobile'];
+    protected function addGroupToGroup(string $outer, string $inner): void
+    {
+        // posixGroup uses memberUid (RFC 2307) and doesn't model nested
+        // groups. The spec carries 'contains' for AD's sake; on slapd
+        // it's silently ignored.
     }
-    if (isset($u['samba']['userAccountControl'])) {
-        $attrs['userAccountControl'] = (string) $u['samba']['userAccountControl'];
-    }
-    ldbModify($ctx, $dn, $attrs);
-}
 
-function addUserToGroup(string $uid, string $group, string $backend, array $ctx): void
-{
-    if ($backend === 'openldap') {
-        $ldif = "dn: cn={$group},{$ctx['groups_ou']}\n"
-              . "changetype: modify\n"
-              . "add: memberUid\n"
-              . "memberUid: {$uid}\n";
-        ldapModify($ldif, $ctx);
-    } else {
-        runDockerExec($ctx['container'], [
-            'samba-tool', 'group', 'addmembers', $group, $uid,
-        ]);
-    }
-}
-
-function addGroupToGroup(string $outer, string $inner, string $backend, array $ctx): void
-{
-    if ($backend !== 'samba') {
-        throw new RuntimeException("Group nesting is only modelled for samba");
-    }
-    runDockerExec($ctx['container'], [
-        'samba-tool', 'group', 'addmembers', $outer, $inner,
-    ]);
-}
-
-function addPaddingUsers(array $padding, string $backend, array $ctx): void
-{
-    $count = $padding['count'];
-    echo "  + padding users (1..{$count}, this takes a minute)\n";
-    for ($i = 1; $i <= $count; $i++) {
-        $uid   = sprintf($padding['uid_format'], $i);
-        $given = sprintf($padding['givenName_format'], $i);
-        if ($backend === 'openldap') {
-            // Padding only configured for samba in users.json; if it ever
-            // expands, this branch will need uidNumber/gidNumber allocation.
-            throw new RuntimeException("Padding for openldap not implemented");
-        }
-        runDockerExec($ctx['container'], [
-            'samba-tool', 'user', 'create', $uid, $padding['password'],
-            '--given-name=' . $given,
-            '--surname='    . $padding['sn'],
-            '--use-username-as-cn',
-        ]);
-        foreach ($padding['memberships'] ?? [] as $m) {
-            if ($i <= $m['first_n']) {
-                runDockerExec($ctx['container'], [
-                    'samba-tool', 'group', 'addmembers', $m['group'], $uid,
-                ]);
+    protected function addPaddingUsers(array $p): void
+    {
+        echo "  + padding users (1..{$p['count']})\n";
+        for ($i = 1; $i <= $p['count']; $i++) {
+            $uid       = sprintf($p['uid_format'], $i);
+            $given     = sprintf($p['givenName_format'], $i);
+            $uidNumber = ++$this->nextUidNumber;
+            $ldif  = "dn: uid={$uid},{$this->peopleOu}\n";
+            $ldif .= "objectClass: inetOrgPerson\n";
+            $ldif .= "objectClass: posixAccount\n";
+            $ldif .= "uid: {$uid}\n";
+            $ldif .= "cn: {$given} {$p['sn']}\n";
+            $ldif .= "sn: {$p['sn']}\n";
+            $ldif .= "givenName: {$given}\n";
+            $ldif .= "uidNumber: {$uidNumber}\n";
+            $ldif .= "gidNumber: {$uidNumber}\n";
+            $ldif .= "homeDirectory: /home/{$uid}\n";
+            $ldif .= 'userPassword: ' . $this->sshaHash($p['password']) . "\n";
+            $this->ldapAdd($ldif);
+            foreach ($p['memberships'] ?? [] as $m) {
+                if ($i <= $m['first_n']) {
+                    $this->addUserToGroup($uid, $m['group']);
+                }
             }
-        }
-        if ($i % 50 === 0) {
-            echo "    ...{$i}/{$count}\n";
+            if ($i % 50 === 0) echo "    ...{$i}/{$p['count']}\n";
         }
     }
-}
 
-function applyPasswordPolicy(array $policy, string $backend, array $ctx): void
-{
-    if ($backend !== 'samba') return;
-    if (isset($policy['max_pwd_age_days'])) {
-        runDockerExec($ctx['container'], [
-            'samba-tool', 'domain', 'passwordsettings', 'set',
-            '--max-pwd-age=' . $policy['max_pwd_age_days'],
+    protected function finalize(): void
+    {
+        // nothing
+    }
+
+    private function entryExists(string $dn): bool
+    {
+        return 0 === $this->runCmdStatus([
+            'ldapsearch', '-x',
+            '-H', "ldap://{$this->host}:{$this->port}",
+            '-D', $this->bindDn, '-w', $this->bindPw,
+            '-b', $dn, '-s', 'base', '-LLL', '(objectClass=*)', 'dn',
         ]);
     }
-}
 
-// ---------------------------------------------------------------------------
-// Backend invocation helpers
-// ---------------------------------------------------------------------------
-
-function ensureContainer(string $dn, array $ctx): void
-{
-    if (entryExists($dn, $ctx)) {
-        return;
+    private function ldapAdd(string $ldif): void
+    {
+        $this->runCmd([
+            'ldapadd', '-x',
+            '-H', "ldap://{$this->host}:{$this->port}",
+            '-D', $this->bindDn, '-w', $this->bindPw,
+        ], $ldif);
     }
-    [$rdnAttr, $rdnValue] = explode('=', explode(',', $dn, 2)[0], 2);
-    echo "  + container {$dn}\n";
-    ldapAdd("dn: {$dn}\nobjectClass: organizationalUnit\n{$rdnAttr}: {$rdnValue}\n", $ctx);
-}
 
-function entryExists(string $dn, array $ctx): bool
-{
-    $proc = proc_open(
-        ['ldapsearch', '-x',
-         '-H', "ldap://{$ctx['host']}:{$ctx['port']}",
-         '-D', $ctx['bind_dn'],
-         '-w', $ctx['bind_pw'],
-         '-b', $dn,
-         '-s', 'base', '-LLL', '(objectClass=*)', 'dn'],
-        [0 => ['file', '/dev/null', 'r'],
-         1 => ['file', '/dev/null', 'w'],
-         2 => ['file', '/dev/null', 'w']],
-        $pipes
-    );
-    return is_resource($proc) && proc_close($proc) === 0;
-}
-
-function ldapAdd(string $ldif, array $ctx): void
-{
-    run(
-        ['ldapadd', '-x',
-         '-H', "ldap://{$ctx['host']}:{$ctx['port']}",
-         '-D', $ctx['bind_dn'],
-         '-w', $ctx['bind_pw']],
-        $ldif
-    );
-}
-
-function ldapModify(string $ldif, array $ctx): void
-{
-    run(
-        ['ldapmodify', '-x',
-         '-H', "ldap://{$ctx['host']}:{$ctx['port']}",
-         '-D', $ctx['bind_dn'],
-         '-w', $ctx['bind_pw']],
-        $ldif
-    );
-}
-
-function ldbModify(array $ctx, string $dn, array $attrs): void
-{
-    $ldif = "dn: {$dn}\nchangetype: modify\n";
-    $first = true;
-    foreach ($attrs as $name => $value) {
-        if (!$first) $ldif .= "-\n";
-        $ldif .= "replace: {$name}\n{$name}: {$value}\n";
-        $first = false;
+    private function ldapModify(string $ldif): void
+    {
+        $this->runCmd([
+            'ldapmodify', '-x',
+            '-H', "ldap://{$this->host}:{$this->port}",
+            '-D', $this->bindDn, '-w', $this->bindPw,
+        ], $ldif);
     }
-    runDockerExec($ctx['container'], ['ldbmodify', '-H', $ctx['ldb_path']], $ldif);
+
+    private function sshaHash(string $pw): string
+    {
+        // Deterministic salt so the LDIF is reproducible.
+        $salt = substr(hash('sha1', "ssha-salt:{$pw}", true), 0, 4);
+        return '{SSHA}' . base64_encode(sha1($pw . $salt, true) . $salt);
+    }
 }
 
-function runDockerExec(string $container, array $cmd, ?string $stdin = null): void
-{
-    $needs_stdin = $stdin !== null;
-    $argv = ['docker', 'exec'];
-    if ($needs_stdin) $argv[] = '-i';
-    $argv[] = $container;
-    array_push($argv, ...$cmd);
-    run($argv, $stdin);
-}
 
-function run(array $cmd, ?string $stdin = null): string
+class SambaProvisioner extends Provisioner
 {
-    $descriptors = [
-        0 => $stdin !== null ? ['pipe', 'r'] : ['file', '/dev/null', 'r'],
-        1 => ['pipe', 'w'],
-        2 => ['pipe', 'w'],
-    ];
-    $proc = proc_open($cmd, $descriptors, $pipes);
-    if (!is_resource($proc)) {
-        throw new RuntimeException('Failed to spawn: ' . implode(' ', $cmd));
-    }
-    if ($stdin !== null) {
-        fwrite($pipes[0], $stdin);
-        fclose($pipes[0]);
-    }
-    $out = stream_get_contents($pipes[1]);
-    $err = stream_get_contents($pipes[2]);
-    fclose($pipes[1]);
-    fclose($pipes[2]);
-    $code = proc_close($proc);
-    if ($code !== 0) {
-        fwrite(STDERR, "\nCommand failed (exit {$code}): " . implode(' ', $cmd) . "\n");
-        if ($stdin !== null) fwrite(STDERR, "stdin:\n{$stdin}\n");
-        if ($out !== '')     fwrite(STDERR, "stdout:\n{$out}\n");
-        if ($err !== '')     fwrite(STDERR, "stderr:\n{$err}\n");
-        exit(1);
-    }
-    return $out;
-}
+    private string $container;
+    private string $usersDn;
+    private const LDB_PATH = '/var/lib/samba/private/sam.ldb';
 
-// ---------------------------------------------------------------------------
-// Lifecycle: wait, probe, verify
-// ---------------------------------------------------------------------------
+    public function __construct(array $spec)
+    {
+        parent::__construct($spec);
+        $this->container = $this->env('SAMBA_CONTAINER');
+        $this->usersDn   = $this->env('SAMBA_USERS_DN');
+    }
 
-function waitForBackend(string $backend, array $ctx): void
-{
-    echo "Waiting for {$backend} to become responsive...\n";
-    $deadline = time() + ($backend === 'samba' ? 240 : 120);
-    while (time() < $deadline) {
-        if (backendReady($backend, $ctx)) {
-            echo "  ready.\n";
+    protected function isAlreadyProvisioned(): bool
+    {
+        return 0 === $this->runCmdStatus([
+            'docker', 'exec', $this->container,
+            'samba-tool', 'user', 'show', 'alice',
+        ]);
+    }
+
+    protected function ensureRoot(): void
+    {
+        // CN=Users,DC=… is created by samba's own provisioning at first
+        // boot; nothing for us to seed.
+    }
+
+    protected function applyPasswordPolicy(): void
+    {
+        if (!isset($this->spec['password_policy']['max_pwd_age_days'])) {
             return;
         }
-        usleep(500_000);
+        $days = $this->spec['password_policy']['max_pwd_age_days'];
+        $this->dockerExec([
+            'samba-tool', 'domain', 'passwordsettings', 'set',
+            "--max-pwd-age={$days}",
+        ]);
     }
-    fwrite(STDERR, "::error::{$backend} did not become responsive in time\n");
-    exit(1);
-}
 
-function backendReady(string $backend, array $ctx): bool
-{
-    if ($backend === 'openldap') {
-        $proc = proc_open(
-            ['ldapsearch', '-x',
-             '-H', "ldap://{$ctx['host']}:{$ctx['port']}",
-             '-D', $ctx['bind_dn'],
-             '-w', $ctx['bind_pw'],
-             '-b', $ctx['base'],
-             '-s', 'base', '-LLL', '(objectClass=*)', 'dn'],
-            [0 => ['file', '/dev/null', 'r'],
-             1 => ['file', '/dev/null', 'w'],
-             2 => ['file', '/dev/null', 'w']],
-            $pipes
-        );
-        return is_resource($proc) && proc_close($proc) === 0;
+    protected function addGroup(array $g): void
+    {
+        echo "  + group {$g['name']}\n";
+        $this->dockerExec(['samba-tool', 'group', 'add', $g['name']]);
     }
-    $proc = proc_open(
-        ['docker', 'exec', $ctx['container'], 'samba-tool', 'user', 'list'],
-        [0 => ['file', '/dev/null', 'r'],
-         1 => ['file', '/dev/null', 'w'],
-         2 => ['file', '/dev/null', 'w']],
-        $pipes
-    );
-    return is_resource($proc) && proc_close($proc) === 0;
-}
 
-function probeUser(string $uid, string $backend, array $ctx): bool
-{
-    if ($backend === 'openldap') {
-        $proc = proc_open(
-            ['ldapsearch', '-x',
-             '-H', "ldap://{$ctx['host']}:{$ctx['port']}",
-             '-D', $ctx['bind_dn'],
-             '-w', $ctx['bind_pw'],
-             '-b', $ctx['people_ou'],
-             '-LLL', "(uid={$uid})", 'uid'],
-            [0 => ['file', '/dev/null', 'r'],
-             1 => ['pipe', 'w'],
-             2 => ['file', '/dev/null', 'w']],
-            $pipes
-        );
-        if (!is_resource($proc)) return false;
-        $out = stream_get_contents($pipes[1]);
-        fclose($pipes[1]);
-        proc_close($proc);
-        return str_contains($out, "uid: {$uid}");
-    }
-    $proc = proc_open(
-        ['docker', 'exec', $ctx['container'], 'samba-tool', 'user', 'show', $uid],
-        [0 => ['file', '/dev/null', 'r'],
-         1 => ['file', '/dev/null', 'w'],
-         2 => ['file', '/dev/null', 'w']],
-        $pipes
-    );
-    return is_resource($proc) && proc_close($proc) === 0;
-}
+    protected function addUser(array $u): void
+    {
+        echo "  + user {$u['uid']}\n";
+        $cmd = [
+            'samba-tool', 'user', 'create', $u['uid'], $u['password'],
+            '--given-name=' . $u['givenName'],
+            '--surname='    . $u['sn'],
+            '--use-username-as-cn',
+        ];
+        if (isset($u['mail'])) $cmd[] = '--mail-address=' . $u['mail'];
+        $this->dockerExec($cmd);
 
-function verify(string $backend, array $ctx): void
-{
-    if (!probeUser($ctx['probe_user'], $backend, $ctx)) {
-        fwrite(STDERR, "::error::Post-provision probe failed: {$ctx['probe_user']} not found in {$backend}\n");
-        exit(1);
-    }
-    echo "Verified: {$ctx['probe_user']} present in {$backend}\n";
-}
-
-// ---------------------------------------------------------------------------
-// Misc helpers
-// ---------------------------------------------------------------------------
-
-function forBackend(array $entities, string $backend): array
-{
-    return array_values(array_filter(
-        $entities,
-        fn($e) => in_array($backend, $e['backends'] ?? [], true)
-    ));
-}
-
-function stripCommentKeys($v)
-{
-    if (is_array($v)) {
-        $out = [];
-        foreach ($v as $k => $vv) {
-            if (is_string($k) && str_starts_with($k, '_comment')) continue;
-            $out[$k] = stripCommentKeys($vv);
+        // Drop a single ldbmodify with all the post-create attribute
+        // overrides; samba-tool exposes only a subset of attrs as flags.
+        $attrs = ['displayName' => "{$u['givenName']} {$u['sn']}"];
+        if (isset($u['mobile'])) {
+            $attrs['mobile'] = $u['mobile'];
         }
-        return $out;
+        if (!empty($u['passwordNeverExpires'])) {
+            // 512 NORMAL_ACCOUNT | 65536 DONT_EXPIRE_PASSWD = 66048
+            $attrs['userAccountControl'] = '66048';
+        }
+        $this->ldbModify("CN={$u['uid']},{$this->usersDn}", $attrs);
     }
-    return $v;
+
+    protected function addUserToGroup(string $uid, string $group): void
+    {
+        $this->dockerExec(['samba-tool', 'group', 'addmembers', $group, $uid]);
+    }
+
+    protected function addGroupToGroup(string $outer, string $inner): void
+    {
+        $this->dockerExec(['samba-tool', 'group', 'addmembers', $outer, $inner]);
+    }
+
+    protected function addPaddingUsers(array $p): void
+    {
+        echo "  + padding users (1..{$p['count']}, this takes a minute)\n";
+        for ($i = 1; $i <= $p['count']; $i++) {
+            $uid   = sprintf($p['uid_format'], $i);
+            $given = sprintf($p['givenName_format'], $i);
+            $this->dockerExec([
+                'samba-tool', 'user', 'create', $uid, $p['password'],
+                "--given-name={$given}",
+                "--surname={$p['sn']}",
+                '--use-username-as-cn',
+            ]);
+            foreach ($p['memberships'] ?? [] as $m) {
+                if ($i <= $m['first_n']) {
+                    $this->dockerExec(['samba-tool', 'group', 'addmembers', $m['group'], $uid]);
+                }
+            }
+            if ($i % 50 === 0) echo "    ...{$i}/{$p['count']}\n";
+        }
+    }
+
+    protected function finalize(): void
+    {
+        echo "  + regenerate TLS cert with localhost SAN\n";
+        $this->dockerExec(['/regen-tls.sh']);
+    }
+
+    private function dockerExec(array $cmd, ?string $stdin = null): void
+    {
+        $argv = ['docker', 'exec'];
+        if ($stdin !== null) $argv[] = '-i';
+        $argv[] = $this->container;
+        array_push($argv, ...$cmd);
+        $this->runCmd($argv, $stdin);
+    }
+
+    private function ldbModify(string $dn, array $attrs): void
+    {
+        $ldif = "dn: {$dn}\nchangetype: modify\n";
+        $first = true;
+        foreach ($attrs as $name => $value) {
+            if (!$first) $ldif .= "-\n";
+            $ldif .= "replace: {$name}\n{$name}: {$value}\n";
+            $first = false;
+        }
+        $this->dockerExec(['ldbmodify', '-H', self::LDB_PATH], $ldif);
+    }
 }
 
-function sshaHash(string $password): string
-{
-    // Deterministic salt so re-rendering is reproducible. The salt
-    // is embedded in the hash, so slapd verifies it correctly
-    // regardless of how it was generated.
-    $salt = substr(hash('sha1', "ssha-salt:{$password}", true), 0, 4);
-    return '{SSHA}' . base64_encode(sha1($password . $salt, true) . $salt);
-}
+
+// ---------------------------------------------------------------------------
+
+$spec = json_decode(file_get_contents(SPEC_PATH), true, 512, JSON_THROW_ON_ERROR);
+
+// Strip _comment keys (allowed in users.json for human notes)
+$strip = function ($v) use (&$strip) {
+    if (!is_array($v)) return $v;
+    $out = [];
+    foreach ($v as $k => $vv) {
+        if (is_string($k) && str_starts_with($k, '_comment')) continue;
+        $out[$k] = $strip($vv);
+    }
+    return $out;
+};
+$spec = $strip($spec);
+
+(new OpenLDAPProvisioner($spec))->run();
+(new SambaProvisioner($spec))->run();
+
+echo "All backends provisioned.\n";

@@ -2,7 +2,7 @@
 # Regenerate Samba's TLS cert with a localhost SAN so the test client
 # (FreeDSx with validate=self) can complete the STARTTLS handshake.
 # Runs INSIDE the pureldap-samba container, invoked from the host by
-# provision.php as the last step of Samba fixture setup.
+# SambaProvisioner::finalize() as the last step of fixture setup.
 #
 # Samba's default auto-generated cert is issued for the DC's FQDN
 # (dc1.example.local); the plugin connects to localhost:7389, so we

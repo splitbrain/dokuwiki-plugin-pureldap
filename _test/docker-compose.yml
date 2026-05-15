@@ -1,0 +1,90 @@
+# Single compose file for both LDAP integration fixtures.
+#
+# `docker compose -f _test/docker-compose.yml run --rm provisioner` is
+# the complete fixture setup: it starts openldap and samba, waits for
+# both to be healthy, runs provision.php which applies users.json to
+# each backend, then exits. Both LDAP services keep running on their
+# host-mapped ports for phpunit to connect to.
+#
+# Connection details for both backends live as environment variables
+# on the provisioner service block — users.json is pure data.
+
+services:
+  openldap:
+    image: osixia/openldap:1.5.0
+    container_name: pureldap-openldap
+    environment:
+      LDAP_ORGANISATION: "Pureldap Test"
+      LDAP_DOMAIN:       "example.org"
+      LDAP_ADMIN_PASSWORD: "adminpass"
+      LDAP_TLS: "false"
+      # Stay on the default NIS schema. RFC 2307bis turns posixGroup
+      # into an AUXILIARY objectClass, which would make the
+      # provisioner's group entries (posixGroup is structural) fail.
+    ports:
+      - "1389:389"
+    healthcheck:
+      test: ["CMD-SHELL", "ldapwhoami -x -H ldap://localhost >/dev/null 2>&1"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+      start_period: 5s
+
+  samba:
+    image: nowsci/samba-domain:latest
+    container_name: pureldap-samba
+    hostname: dc1
+    # AD-DC needs to control its own hostname resolution
+    domainname: example.local
+    privileged: true
+    environment:
+      DOMAIN:         "EXAMPLE.LOCAL"
+      DOMAINPASS:     "Vagrantvagrantvagrant1"
+      DOMAIN_NETBIOS: "EXAMPLE"
+      DOMAIN_EMAIL:   "admin@example.local"
+      DNSFORWARDER:   "1.1.1.1"
+      HOSTIP:         "127.0.0.1"
+      INSECURELDAP:   "true"
+      MULTISITE:      "false"
+      NOCOMPLEXITY:   "false"
+      DISABLE_DNS:    "false"
+    ports:
+      - "7389:389"
+      - "7636:636"
+    volumes:
+      - ./fixtures/samba-regen-tls.sh:/regen-tls.sh:ro
+    healthcheck:
+      # samba-tool only responds once domain provisioning has finished,
+      # which takes 30-90s after first boot — wide window accommodates.
+      test: ["CMD-SHELL", "samba-tool user list >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 30s
+      retries: 60
+      start_period: 30s
+
+  provisioner:
+    image: php:8.2-cli-alpine
+    depends_on:
+      openldap:
+        condition: service_healthy
+      samba:
+        condition: service_healthy
+    volumes:
+      - ./fixtures:/fixtures:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      OPENLDAP_HOST:      openldap
+      OPENLDAP_PORT:      "389"
+      OPENLDAP_BIND_DN:   "cn=admin,dc=example,dc=org"
+      OPENLDAP_BIND_PW:   "adminpass"
+      OPENLDAP_PEOPLE_OU: "ou=People,dc=example,dc=org"
+      OPENLDAP_GROUPS_OU: "ou=Groups,dc=example,dc=org"
+      SAMBA_CONTAINER:    "pureldap-samba"
+      SAMBA_USERS_DN:     "CN=Users,DC=example,DC=local"
+    command:
+      - sh
+      - -c
+      - |
+        apk add --no-cache --quiet openldap-clients docker-cli >/dev/null
+        php /fixtures/provision.php
+    restart: "no"
