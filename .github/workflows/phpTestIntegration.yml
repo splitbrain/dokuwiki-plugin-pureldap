@@ -46,19 +46,21 @@ jobs:
 
             - name: Bring up fixtures
               run: |
-                set -e
+                set -ex
+                docker --version
+                docker compose version
                 docker compose -f _test/docker-compose.yml up -d
-                docker compose -f _test/docker-compose.yml ps
+                docker compose -f _test/docker-compose.yml ps -a
 
             - name: Provision OpenLDAP
               run: |
-                set -e
+                set -ex
                 docker exec pureldap-openldap bash    /fixtures/openldap/setup.sh
                 docker exec pureldap-openldap python3 /fixtures/openldap/provision.py
 
             - name: Provision Samba AD
               run: |
-                set -e
+                set -ex
                 docker exec pureldap-samba bash    /fixtures/samba/setup.sh
                 docker exec pureldap-samba python3 /fixtures/samba/provision.py
 
@@ -85,5 +87,16 @@ jobs:
             - name: Dump fixture logs on failure
               if: failure()
               run: |
+                set +e
+                echo "==== docker ps -a ===="
+                docker ps -a
+                echo "==== docker compose ps -a ===="
                 docker compose -f _test/docker-compose.yml ps -a
-                docker compose -f _test/docker-compose.yml logs --tail=300 || true
+                echo "==== compose logs ===="
+                docker compose -f _test/docker-compose.yml logs --tail=500 || true
+                for c in pureldap-openldap pureldap-samba; do
+                  echo "==== inspect $c ===="
+                  docker inspect "$c" --format '{{.State.Status}} ({{.State.ExitCode}}) {{.State.Error}}' 2>&1 || true
+                  echo "==== $c: which ldapadd python3 samba-tool slappasswd ===="
+                  docker exec "$c" sh -c 'for b in ldapadd ldapsearch ldapmodify python3 samba-tool slappasswd ldbmodify bash; do echo "  $b: $(command -v "$b" || echo MISSING)"; done' 2>&1 || true
+                done

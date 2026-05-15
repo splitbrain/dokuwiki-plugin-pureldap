@@ -4,7 +4,7 @@
 # finish (samba-tool returns 0), sets the password-age policy explicitly
 # so testMaxPasswordAge can't drift, and installs the shared TLS material
 # from the tls-init volume mounted read-only at /certs.
-set -euo pipefail
+set -euxo pipefail
 
 TLS_SRC="/certs"
 TLS_DST="/var/lib/samba/private/tls"

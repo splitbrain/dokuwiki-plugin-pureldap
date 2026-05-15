@@ -3,7 +3,7 @@
 # openldap container is up. Installs the ldap-utils package (osixia
 # doesn't ship it), waits for slapd, then creates the two OUs the
 # provisioner writes into.
-set -euo pipefail
+set -euxo pipefail
 
 HOST="localhost"
 PORT="389"
@@ -13,8 +13,9 @@ BASE="dc=example,dc=com"
 
 if ! command -v ldapadd >/dev/null 2>&1; then
     echo "[openldap setup] installing ldap-utils..."
-    DEBIAN_FRONTEND=noninteractive apt-get update -qq
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends ldap-utils
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y --no-install-recommends ldap-utils
 fi
 
 # Wait for slapd to become responsive (image's own entrypoint starts it).
