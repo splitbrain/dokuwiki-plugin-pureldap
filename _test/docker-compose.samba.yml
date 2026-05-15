@@ -7,7 +7,7 @@
 #
 # Usage:
 #   docker compose -f _test/docker-compose.samba.yml up -d
-#   docker exec pureldap-samba /provision-fixture.sh
+#   bash _test/fixtures/samba/provision.sh
 #   php phpunit.phar --group plugin_pureldap _test/ADClientTest.php
 #   docker compose -f _test/docker-compose.samba.yml down -v
 
@@ -35,4 +35,3 @@ services:
       - "7636:636"
     volumes:
       - ./fixtures/samba/provision-fixture.sh:/provision-fixture.sh:ro
-      - ./fixtures/samba/regenerate-tls.sh:/regenerate-tls.sh:ro
