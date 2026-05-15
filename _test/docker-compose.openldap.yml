@@ -20,7 +20,10 @@ services:
       LDAP_DOMAIN: "example.org"
       LDAP_ADMIN_PASSWORD: "adminpass"
       LDAP_TLS: "false"
-      LDAP_RFC2307BIS_SCHEMA: "true"
+      # Stay on the default NIS schema. RFC 2307bis turns posixGroup
+      # into an AUXILIARY objectClass, which makes the bootstrap LDIF
+      # (groups carry posixGroup as their structural class) fail to
+      # load and silently leaves slapd with no test data.
     ports:
       - "1389:389"
     volumes:
