@@ -31,11 +31,20 @@ USER_PASSWORD = "Foo_b_ar123!"
 SENTINEL = Path("/tmp/provisioned")
 
 
-def ldap(cmd, stdin=None):
+def ldap(cmd, stdin=None, allow_exists=False):
     full = [cmd, "-x", "-H", "ldap://localhost",
             "-D", ADMIN_DN, "-w", ADMIN_PW]
     r = subprocess.run(full, input=stdin, text=True, capture_output=True)
     if r.returncode != 0:
+        # err=68 (entryAlreadyExists) on ldapadd, err=20 (typeOrValueExists)
+        # on ldapmodify with `add: memberUid`. Both mean "retry-safe noop".
+        combined = (r.stdout or "") + (r.stderr or "")
+        if allow_exists and (
+            "Already exists" in combined
+            or "already exists" in combined
+            or "Type or value exists" in combined
+        ):
+            return
         sys.stderr.write(f"\n{full} failed (exit {r.returncode})\n")
         if stdin:    sys.stderr.write(f"stdin:\n{stdin}\n")
         if r.stdout: sys.stderr.write(f"stdout: {r.stdout}\n")
@@ -75,7 +84,7 @@ def add_group(name, gid):
         f"cn: {name}\n"
         f"gidNumber: {gid}\n"
     )
-    ldap("ldapadd", stdin=ldif)
+    ldap("ldapadd", stdin=ldif, allow_exists=True)
 
 
 def add_user(uid, row, uid_number):
@@ -89,6 +98,10 @@ def add_user(uid, row, uid_number):
     ]
     if row.get("homepage"):
         lines.append("objectClass: labeledURIObject")
+    # `c` (countryName) isn't allowed by inetOrgPerson/organizationalPerson —
+    # add extensibleObject so the schema accepts it.
+    if row.get("country"):
+        lines.append("objectClass: extensibleObject")
     lines.extend([
         f"uid: {uid}",
         f"cn: {cn}",
@@ -117,7 +130,7 @@ def add_user(uid, row, uid_number):
         if v:
             lines.append(f"{attr}: {v}")
     ldif = "\n".join(lines) + "\n"
-    ldap("ldapadd", stdin=ldif)
+    ldap("ldapadd", stdin=ldif, allow_exists=True)
 
 
 def add_to_group(uid, group):
@@ -126,7 +139,7 @@ def add_to_group(uid, group):
         "changetype: modify\n"
         "add: memberUid\n"
         f"memberUid: {uid}\n"
-    ))
+    ), allow_exists=True)
 
 
 def main():
@@ -161,10 +174,13 @@ def main():
         uid_number += 1
         print(f"  + user {uid}")
         add_user(uid, row, uid_number)
+        user_groups = []
         for col in ("group1", "group2", "group3"):
             grp = row.get(col, "").strip()
-            if grp:
-                add_to_group(uid, grp)
+            if grp and grp not in user_groups:
+                user_groups.append(grp)
+        for grp in user_groups:
+            add_to_group(uid, grp)
         if uid_number % 50 == 0:
             print(f"    ...{uid_number - 1000}/{len(rows)}")
 

@@ -30,8 +30,23 @@ if ! samba-tool user list >/dev/null 2>&1; then
     exit 1
 fi
 
+# `user list` can succeed before the domain is fully provisioned for
+# writes (admin password change, password policy). Retry the policy
+# change until samba accepts it.
 echo "[samba/setup] setting domain password policy..."
-samba-tool domain passwordsettings set --max-pwd-age=42
+for i in $(seq 1 60); do
+    if samba-tool domain passwordsettings set --max-pwd-age=42 \
+            >/dev/null 2>&1; then
+        break
+    fi
+    sleep 2
+done
+if ! samba-tool domain passwordsettings show \
+        | grep -q "Maximum password age (days): 42"; then
+    echo "[samba/setup] domain passwordsettings never accepted within 120s" >&2
+    samba-tool domain passwordsettings set --max-pwd-age=42 || true
+    exit 1
+fi
 
 echo "[samba/setup] installing TLS cert from /certs..."
 TLS_DIR=/var/lib/samba/private/tls

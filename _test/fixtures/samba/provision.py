@@ -24,9 +24,12 @@ SAM_LDB   = "/var/lib/samba/private/sam.ldb"
 SENTINEL  = Path("/tmp/provisioned")
 
 
-def run(cmd, stdin=None):
+def run(cmd, stdin=None, allow_exists=False):
     r = subprocess.run(cmd, input=stdin, text=True, capture_output=True)
     if r.returncode != 0:
+        combined = (r.stdout or "") + (r.stderr or "")
+        if allow_exists and "already exists" in combined:
+            return
         sys.stderr.write(f"\n{cmd} failed (exit {r.returncode})\n")
         if stdin:    sys.stderr.write(f"stdin:\n{stdin}\n")
         if r.stdout: sys.stderr.write(f"stdout: {r.stdout}\n")
@@ -48,7 +51,7 @@ def ldb_modify(dn, attrs):
         parts.append(f"{name}: {value}")
         sep_needed = True
     ldif = "\n".join(parts) + "\n"
-    run(["ldbmodify", "-H", SAM_LDB], stdin=ldif)
+    run(["ldbmodify", "-i", "-H", SAM_LDB], stdin=ldif)
 
 
 def user_exists(uid):
@@ -59,7 +62,7 @@ def user_exists(uid):
 
 def add_group(name):
     print(f"  + group {name}")
-    run(["samba-tool", "group", "add", name])
+    run(["samba-tool", "group", "add", name], allow_exists=True)
 
 
 def add_user(uid, row):
@@ -68,16 +71,12 @@ def add_user(uid, row):
         "samba-tool", "user", "create", uid, USER_PASSWORD,
         f"--given-name={row['first']}",
         f"--surname={row['last']}",
-        f"--userprincipalname={uid}@example.com",
         f"--mail-address={uid}@example.com",
     ]
     for col, flag in [
         ("phone",       "--telephone-number"),
-        ("city",        "--city"),
         ("company",     "--company"),
         ("department",  "--department"),
-        ("postal_code", "--postal-code"),
-        ("street",      "--street"),
     ]:
         v = row.get(col)
         if v:
@@ -89,23 +88,26 @@ def add_user(uid, row):
     attrs = {"displayName": cn}
     # 512 NORMAL_ACCOUNT | 65536 DONT_EXPIRE_PASSWD = 66048
     attrs["userAccountControl"] = "66048"
-    if row.get("mobile"):    attrs["mobile"]      = row["mobile"]
-    if row.get("title"):     attrs["personalTitle"] = row["title"]
-    if row.get("homepage"):  attrs["wWWHomePage"] = row["homepage"]
-    if row.get("country"):   attrs["c"]           = row["country"]
+    attrs["userPrincipalName"] = f"{uid}@example.com"
+    if row.get("mobile"):      attrs["mobile"]      = row["mobile"]
+    if row.get("title"):       attrs["personalTitle"] = row["title"]
+    if row.get("homepage"):    attrs["wWWHomePage"] = row["homepage"]
+    if row.get("country"):     attrs["c"]           = row["country"]
+    if row.get("city"):        attrs["l"]           = row["city"]
+    if row.get("postal_code"): attrs["postalCode"]  = row["postal_code"]
+    if row.get("street"):      attrs["streetAddress"] = row["street"]
     ldb_modify(f"CN={cn},{USERS_DN}", attrs)
 
 
 def add_to_group(uid, group):
-    run(["samba-tool", "group", "addmembers", group, uid])
+    run(["samba-tool", "group", "addmembers", group, uid], allow_exists=True)
 
 
 def main():
-    if user_exists("a.legrand"):
-        print("[samba/provision] already provisioned, skipping")
-        SENTINEL.touch()
-        return
-
+    # No early-return idempotency: a previous run might have crashed
+    # partway through, so we always walk the full list. Each step is
+    # already idempotent (per-record user_exists checks + allow_exists
+    # on group adds and group-member adds).
     print("[samba/provision] reading", GROUPS_CSV)
     group_rows = []
     with open(GROUPS_CSV) as f:
@@ -119,7 +121,8 @@ def main():
         parent = row.get("parent", "").strip()
         if parent:
             print(f"  + nest {row['name']} into {parent}")
-            run(["samba-tool", "group", "addmembers", parent, row["name"]])
+            run(["samba-tool", "group", "addmembers", parent, row["name"]],
+                allow_exists=True)
 
     print("[samba/provision] reading", USERS_CSV)
     with open(USERS_CSV) as f:
@@ -132,27 +135,36 @@ def main():
             print(f"  ! duplicate uid {uid}, skipping", file=sys.stderr)
             continue
         seen_uids.add(uid)
-        print(f"  + user {uid}")
-        add_user(uid, row)
+        if user_exists(uid):
+            print(f"  = user {uid} already exists, skipping")
+        else:
+            print(f"  + user {uid}")
+            add_user(uid, row)
+        user_groups = []
         for col in ("group1", "group2", "group3"):
             grp = row.get(col, "").strip()
-            if grp:
-                add_to_group(uid, grp)
+            if grp and grp not in user_groups:
+                user_groups.append(grp)
+        for grp in user_groups:
+            add_to_group(uid, grp)
         if i % 50 == 0:
             print(f"    ...{i}/{len(rows)}")
 
     # Hardcoded long-name edge case (importusers.ps1's "Very Long" / longlong).
-    print("  + user longlong (averylongusernamethatisverylong UPN)")
-    run([
-        "samba-tool", "user", "create", "longlong", USER_PASSWORD,
-        "--given-name=Very", "--surname=Long",
-        "--userprincipalname=averylongusernamethatisverylong@example.com",
-        "--mail-address=longlong@example.com",
-    ])
-    ldb_modify(f"CN=Very Long,{USERS_DN}", {
-        "displayName":        "Very Long",
-        "userAccountControl": "66048",
-    })
+    if user_exists("longlong"):
+        print("  = user longlong already exists, skipping")
+    else:
+        print("  + user longlong (averylongusernamethatisverylong UPN)")
+        run([
+            "samba-tool", "user", "create", "longlong", USER_PASSWORD,
+            "--given-name=Very", "--surname=Long",
+            "--mail-address=longlong@example.com",
+        ])
+        ldb_modify(f"CN=Very Long,{USERS_DN}", {
+            "displayName":        "Very Long",
+            "userAccountControl": "66048",
+            "userPrincipalName":  "averylongusernamethatisverylong@example.com",
+        })
 
     SENTINEL.touch()
     print("[samba/provision] done")
