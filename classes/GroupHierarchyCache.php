@@ -128,7 +128,9 @@ class GroupHierarchyCache
             /** @var Entry $entry */
             foreach ($entries as $entry) {
                 $dn = (string)$entry->getDn();
-                $groups[$dn] = [];
+                // Don't blow away a children list a prior iteration already
+                // built up when this group was reached as someone's parent.
+                if (!isset($groups[$dn])) $groups[$dn] = [];
                 if ($entry->has($this->parentAttr)) {
                     $parents = $entry->get($this->parentAttr)->getValues();
                     $groups[$dn]['parents'] = $parents;
