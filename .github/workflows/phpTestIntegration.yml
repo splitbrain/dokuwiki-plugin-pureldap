@@ -65,13 +65,14 @@ jobs:
               env:
                   LDAP_TEST_HOST: localhost
                   LDAP_TEST_PORT: 1389
-              run: composer exec -- phpunit -c _test/phpunit.xml --verbose --stderr --group plugin_pureldap_integration
+              run: composer exec -- phpunit -c _test/phpunit.xml --verbose --stderr --group plugin_pureldap_ldap
 
             - name: Run Samba AD tests
               env:
-                  LDAP_TEST_HOST: localhost
-                  LDAP_TEST_PORT: 7389
-              run: composer exec -- phpunit -c _test/phpunit.xml --verbose --stderr --group plugin_pureldap --filter '/^(ADClientTest|AuthTest|GroupHierarchyCacheTest)::/'
+                  AD_TEST_HOST: localhost
+                  AD_TEST_PORT: 7389
+                  AD_TEST_PORT_SSL: 7636
+              run: composer exec -- phpunit -c _test/phpunit.xml --verbose --stderr --group plugin_pureldap_ad
 
             - name: Dump fixture logs on failure
               if: failure()
