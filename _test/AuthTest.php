@@ -2,27 +2,27 @@
 
 namespace dokuwiki\plugin\pureldap\test;
 
-require_once __DIR__ . '/RequiresAD.php';
-
 /**
  * @group plugin_pureldap
+ * @group plugin_pureldap_ad
  * @group plugins
  */
-class AuthTest extends \DokuWikiTest {
+class AuthTest extends LDAPTestCase {
 
-    use RequiresAD;
+    protected const HOST_ENV = 'AD_TEST_HOST';
+    protected const PORT_ENV = 'AD_TEST_PORT_SSL';
+    protected const DEFAULT_PORT = 7636;
 
     public function setUp(): void
     {
-        $this->skipIfNoAD('localhost', 7636);
         parent::setUp();
 
         global $conf;
         $conf['auth'] = 'pureldap';
         $conf['plugin']['pureldap']['base_dn'] = 'dc=example,dc=com';
         $conf['plugin']['pureldap']['suffix'] = 'example.com';
-        $conf['plugin']['pureldap']['servers'] = ['localhost'];
-        $conf['plugin']['pureldap']['port'] = 7636;
+        $conf['plugin']['pureldap']['servers'] = [$this->ldapHost];
+        $conf['plugin']['pureldap']['port'] = $this->ldapPort;
         $conf['plugin']['pureldap']['admin_username'] = 'Administrator';
         $conf['plugin']['pureldap']['admin_password'] = 'Foo_b_ar123!';
         $conf['plugin']['pureldap']['encryption'] = 'ssl';

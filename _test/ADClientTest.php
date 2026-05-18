@@ -4,23 +4,18 @@ namespace dokuwiki\plugin\pureldap\test;
 
 use dokuwiki\plugin\pureldap\classes\ADClient;
 
-require_once __DIR__ . '/RequiresAD.php';
-
 /**
  * General tests for the pureldap plugin
  *
  * @group plugin_pureldap
+ * @group plugin_pureldap_ad
  * @group plugins
  */
-class ADClientTest extends \DokuWikiTest
+class ADClientTest extends LDAPTestCase
 {
-    use RequiresAD;
-
-    public function setUp(): void
-    {
-        $this->skipIfNoAD();
-        parent::setUp();
-    }
+    protected const HOST_ENV = 'AD_TEST_HOST';
+    protected const PORT_ENV = 'AD_TEST_PORT';
+    protected const DEFAULT_PORT = 7389;
 
     /**
      * Create a client with default settings
@@ -40,8 +35,8 @@ class ADClientTest extends \DokuWikiTest
                 [
                     'base_dn' => 'dc=example,dc=com',
                     'suffix' => 'example.com',
-                    'servers' => ['localhost'],
-                    'port' => 7389, // SSL: 7636
+                    'servers' => [$this->ldapHost],
+                    'port' => $this->ldapPort, // SSL: 7636
                     'admin_username' => 'Administrator',
                     'admin_password' => 'Foo_b_ar123!',
                     'encryption' => 'tls',

@@ -4,25 +4,19 @@ namespace dokuwiki\plugin\pureldap\test;
 
 use dokuwiki\plugin\pureldap\classes\ADClient;
 use dokuwiki\plugin\pureldap\classes\GroupHierarchyCache;
-use DokuWikiTest;
-
-require_once __DIR__ . '/RequiresAD.php';
 
 /**
  * tests for the pureldap plugin
  *
  * @group plugin_pureldap
+ * @group plugin_pureldap_ad
  * @group plugins
  */
-class GroupHierarchyCacheTest extends DokuWikiTest
+class GroupHierarchyCacheTest extends LDAPTestCase
 {
-    use RequiresAD;
-
-    public function setUp(): void
-    {
-        $this->skipIfNoAD('localhost', 7636);
-        parent::setUp();
-    }
+    protected const HOST_ENV = 'AD_TEST_HOST';
+    protected const PORT_ENV = 'AD_TEST_PORT_SSL';
+    protected const DEFAULT_PORT = 7636;
 
     /**
      * Return an initialized GroupHierarchyCache
@@ -42,8 +36,8 @@ class GroupHierarchyCacheTest extends DokuWikiTest
                 [
                     'base_dn' => 'dc=example,dc=com',
                     'suffix' => 'example.com',
-                    'servers' => ['localhost'],
-                    'port' => 7636,
+                    'servers' => [$this->ldapHost],
+                    'port' => $this->ldapPort,
                     'admin_username' => 'Administrator',
                     'admin_password' => 'Foo_b_ar123!',
                     'encryption' => 'ssl',

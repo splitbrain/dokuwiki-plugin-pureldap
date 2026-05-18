@@ -1,10 +1,9 @@
 <?php
 
-namespace dokuwiki\plugin\pureldap\test\integration;
+namespace dokuwiki\plugin\pureldap\test;
 
 use dokuwiki\plugin\pureldap\classes\Client;
 use dokuwiki\plugin\pureldap\classes\LDAPClient;
-use DokuWikiTest;
 
 /**
  * Integration tests for the generic LDAPClient.
@@ -23,24 +22,14 @@ use DokuWikiTest;
  * rather than failing silently.
  *
  * @group plugin_pureldap
- * @group plugin_pureldap_integration
+ * @group plugin_pureldap_ldap
  * @group plugins
  */
-class LDAPClientTest extends DokuWikiTest
+class LDAPClientTest extends LDAPTestCase
 {
-    /** @var string */
-    protected $host;
-    /** @var int */
-    protected $port;
-
     public function setUp(): void
     {
-        $host = getenv('LDAP_TEST_HOST');
-        if (!$host) {
-            $this->markTestSkipped('Set LDAP_TEST_HOST to run LDAPClient integration tests');
-        }
-        $this->host = $host;
-        $this->port = (int)(getenv('LDAP_TEST_PORT') ?: 389);
+        parent::setUp();
         // TODO: these assertions reference alice/bob/admins/devs/ops, which
         // were in the old OpenLDAP-only bootstrap and aren't in the current
         // fixture (vagrant-CSV-driven). Re-author against a.legrand /
@@ -48,7 +37,6 @@ class LDAPClientTest extends DokuWikiTest
         $this->markTestIncomplete(
             'Pending rewrite against the unified vagrant-CSV fixture data'
         );
-        parent::setUp();
     }
 
     /**
@@ -60,8 +48,8 @@ class LDAPClientTest extends DokuWikiTest
         return new LDAPClient(array_merge([
             'directory_type' => 'ldap',
             'base_dn' => 'dc=example,dc=com',
-            'servers' => [$this->host],
-            'port' => $this->port,
+            'servers' => [$this->ldapHost],
+            'port' => $this->ldapPort,
             'encryption' => 'none',
             'admin_username' => 'cn=admin,dc=example,dc=com',
             'admin_password' => 'Foo_b_ar123!',

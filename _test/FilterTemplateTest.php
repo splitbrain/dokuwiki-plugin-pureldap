@@ -11,6 +11,7 @@ use DokuWikiTest;
  * No LDAP server is required for these.
  *
  * @group plugin_pureldap
+ * @group plugin_pureldap_unit
  * @group plugins
  */
 class FilterTemplateTest extends DokuWikiTest
