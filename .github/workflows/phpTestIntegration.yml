@@ -65,6 +65,7 @@ jobs:
               env:
                   LDAP_TEST_HOST: localhost
                   LDAP_TEST_PORT: 1389
+                  LDAP_TEST_PORT_SSL: 1636
               run: composer exec -- phpunit -c _test/phpunit.xml --verbose --stderr --group plugin_pureldap_ldap
 
             - name: Run Samba AD tests

@@ -47,6 +47,21 @@ class LDAPClientTest extends LDAPTestCase
         ], $extra));
     }
 
+    /**
+     * Resolve the SSL/TLS port for the fixture, or skip the calling test
+     * when the workflow / developer hasn't set one.
+     *
+     * @return int
+     */
+    protected function getSslPort()
+    {
+        $port = getenv('LDAP_TEST_PORT_SSL');
+        if (!$port) {
+            $this->markTestSkipped('Set LDAP_TEST_PORT_SSL to run encrypted-connection tests');
+        }
+        return (int)$port;
+    }
+
     public function testGetUserViaGrouptreeStrategy()
     {
         $client = $this->getClient([
@@ -99,6 +114,29 @@ class LDAPClientTest extends LDAPTestCase
         $this->assertContains('beta', $names);
         $this->assertContains('gamma nested', $names);
         $this->assertContains('omega nested', $names);
+    }
+
+    public function testAuthenticateOverSsl()
+    {
+        $sslPort = $this->getSslPort();
+        $client = $this->getClient([
+            'port' => $sslPort,
+            'encryption' => 'ssl',
+            'validate' => 'self',
+        ]);
+        $this->assertTrue($client->authenticate('a.legrand', 'Foo_b_ar123!'));
+    }
+
+    public function testAuthenticateOverStartTls()
+    {
+        // StartTLS upgrades the plain port; we still gate on the SSL env
+        // var as a stand-in for "this fixture has a usable cert".
+        $this->getSslPort();
+        $client = $this->getClient([
+            'encryption' => 'tls',
+            'validate' => 'self',
+        ]);
+        $this->assertTrue($client->authenticate('a.legrand', 'Foo_b_ar123!'));
     }
 
     public function testGetFilteredUsersByGroup()
