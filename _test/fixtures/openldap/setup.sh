@@ -2,7 +2,7 @@
 # One-shot pre-provisioning setup for the OpenLDAP fixture.
 #
 # Runs inside pureldap-openldap via the compose post_start hook BEFORE
-# provision.py. Two responsibilities:
+# provision.py. Three responsibilities:
 #
 #   1. Ensure ldap-utils is installed. osixia/openldap doesn't always
 #      ship the client tools, and provision.py shells out to ldapadd /
@@ -10,6 +10,10 @@
 #   2. Seed the ou=People / ou=Groups containers. osixia creates the
 #      dc=… root from LDAP_DOMAIN but no sub-OUs, and the LDIFs we
 #      emit later assume those parents exist.
+#   3. Load the memberof overlay so user entries get a synthesised
+#      memberOf attribute. Configured for our group layout (posixGroup
+#      with the `member` attribute populated by the provisioner)
+#      so LDAPClientTest::testGetUserViaMemberOfStrategy can run.
 
 set -euo pipefail
 
@@ -62,5 +66,28 @@ EOF
 
 ensure_ou "$PEOPLE_OU" "People"
 ensure_ou "$GROUPS_OU" "Groups"
+
+# Configure the memberof overlay (idempotent).
+#
+# osixia/openldap ships with memberof already loaded but configured for
+# groupOfUniqueNames + uniqueMember. We need it pointing at our group
+# layout instead: posixGroup (the structural class on our group
+# entries) and `member` (the DN-typed attribute provision.py writes
+# alongside memberUid). Replacing values that already match raises
+# LDAP_UNWILLING_TO_PERFORM, so gate on the current GroupOC value.
+if ! ldapsearch -Y EXTERNAL -H ldapi:/// -b cn=config -LLL \
+        '(olcOverlay=memberof)' olcMemberOfGroupOC 2>/dev/null \
+        | grep -qi 'olcMemberOfGroupOC: posixGroup'; then
+    echo "[openldap/setup] reconfiguring memberof overlay for posixGroup..."
+    ldapmodify -Y EXTERNAL -H ldapi:/// <<'EOF'
+dn: olcOverlay={0}memberof,olcDatabase={1}mdb,cn=config
+changetype: modify
+replace: olcMemberOfGroupOC
+olcMemberOfGroupOC: posixGroup
+-
+replace: olcMemberOfMemberAD
+olcMemberOfMemberAD: member
+EOF
+fi
 
 echo "[openldap/setup] done."

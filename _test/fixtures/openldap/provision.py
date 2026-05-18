@@ -78,9 +78,14 @@ def derive_uid(first, last):
 
 def add_group(name, gid):
     print(f"  + group {name}")
+    # extensibleObject lets us also write the `member` attribute (DN-typed,
+    # not part of the posixGroup schema). setup.sh configures the memberof
+    # overlay against posixGroup + member, so this is how user.memberOf
+    # gets populated.
     ldif = (
         f"dn: cn={name},{GROUPS_OU}\n"
         f"objectClass: posixGroup\n"
+        f"objectClass: extensibleObject\n"
         f"cn: {name}\n"
         f"gidNumber: {gid}\n"
     )
@@ -134,11 +139,18 @@ def add_user(uid, row, uid_number):
 
 
 def add_to_group(uid, group):
+    # Write both attributes in one modify: memberUid (posixGroup-style,
+    # plain uid) for grouptree filters and member (DN-typed) so the
+    # memberof overlay can synthesise the reverse link on the user.
+    user_dn = f"uid={uid},{PEOPLE_OU}"
     ldap("ldapmodify", stdin=(
         f"dn: cn={group},{GROUPS_OU}\n"
         "changetype: modify\n"
         "add: memberUid\n"
         f"memberUid: {uid}\n"
+        "-\n"
+        "add: member\n"
+        f"member: {user_dn}\n"
     ), allow_exists=True)
 
 
