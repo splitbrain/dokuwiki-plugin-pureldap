@@ -12,14 +12,9 @@ use dokuwiki\plugin\pureldap\classes\LDAPClient;
  * (`docker compose up -d --wait`). The whole suite is skipped when
  * LDAP_TEST_HOST is unset, so CI without the docker fixture stays green.
  *
- * NOTE: the test bodies in this file still reference users/groups
- * (alice/bob, admins/devs/ops) that don't exist in the current fixture
- * data — those came from the previous OpenLDAP-only bootstrap LDIF and
- * have since been replaced by the upstream vagrant-active-directory
- * CSV. Rewriting these assertions to use vagrant-CSV users
- * (a.legrand/alpha/beta/Gamma Nested) is follow-up work; for now the
- * tests are marked incomplete so the suite reports them honestly
- * rather than failing silently.
+ * Assertions are authored against the shared users.csv / groups.csv
+ * fixture data. OpenLDAP stores groups flat (parent column ignored),
+ * so a user's `grps` reflects only their direct memberships.
  *
  * @group plugin_pureldap
  * @group plugin_pureldap_ldap
@@ -27,18 +22,6 @@ use dokuwiki\plugin\pureldap\classes\LDAPClient;
  */
 class LDAPClientTest extends LDAPTestCase
 {
-    public function setUp(): void
-    {
-        parent::setUp();
-        // TODO: these assertions reference alice/bob/admins/devs/ops, which
-        // were in the old OpenLDAP-only bootstrap and aren't in the current
-        // fixture (vagrant-CSV-driven). Re-author against a.legrand /
-        // alpha / beta / Gamma Nested as a follow-up.
-        $this->markTestIncomplete(
-            'Pending rewrite against the unified vagrant-CSV fixture data'
-        );
-    }
-
     /**
      * @param array $extra config overrides
      * @return LDAPClient
@@ -72,38 +55,39 @@ class LDAPClientTest extends LDAPTestCase
             'group_strategy' => 'grouptree',
         ]);
 
-        $user = $client->getUser('alice');
+        $user = $client->getUser('m.mcnevin');
         $this->assertIsArray($user);
-        $this->assertSame('alice', $user['user']);
-        $this->assertSame('Alice Example', $user['name']);
-        $this->assertSame('alice@example.org', $user['mail']);
-        $this->assertContains('devs', $user['grps']);
-        $this->assertContains('admins', $user['grps']);
-        $this->assertNotContains('ops', $user['grps']);
+        $this->assertSame('m.mcnevin', $user['user']);
+        $this->assertSame('Marcela McNevin', $user['name']);
+        $this->assertSame('m.mcnevin@example.com', $user['mail']);
+        $this->assertContains('beta', $user['grps']);
+        $this->assertContains('gamma nested', $user['grps']);
+        $this->assertContains('omega nested', $user['grps']);
+        $this->assertNotContains('alpha', $user['grps']);
     }
 
     public function testGetUserViaMemberOfStrategy()
     {
         // Requires the memberOf overlay; skip if the fixture didn't enable it.
         $client = $this->getClient(['group_strategy' => 'memberof']);
-        $user = $client->getUser('alice');
+        $user = $client->getUser('m.mcnevin');
         $this->assertIsArray($user);
-        if (empty($user['grps']) || $user['grps'] === [$client->getConf('defaultgroup')]) {
+        if (empty($user['grps']) || $user['grps'] === ['user']) {
             $this->markTestSkipped('memberOf overlay not enabled on the fixture');
         }
-        $this->assertContains('devs', $user['grps']);
+        $this->assertContains('beta', $user['grps']);
     }
 
     public function testAuthenticateSearchThenBind()
     {
         $client = $this->getClient();
-        $this->assertTrue($client->authenticate('alice', 'password'));
+        $this->assertTrue($client->authenticate('a.legrand', 'Foo_b_ar123!'));
     }
 
     public function testAuthenticateDirectBindTemplate()
     {
         $client = $this->getClient(['binddn' => 'uid=%{user},ou=People,dc=example,dc=com']);
-        $this->assertTrue($client->authenticate('alice', 'password'));
+        $this->assertTrue($client->authenticate('a.legrand', 'Foo_b_ar123!'));
     }
 
     public function testRetrieveGroups()
@@ -111,9 +95,10 @@ class LDAPClientTest extends LDAPTestCase
         $client = $this->getClient();
         $groups = $client->getGroups();
         $names = array_values($groups);
-        $this->assertContains('devs', $names);
-        $this->assertContains('ops', $names);
-        $this->assertContains('admins', $names);
+        $this->assertContains('alpha', $names);
+        $this->assertContains('beta', $names);
+        $this->assertContains('gamma nested', $names);
+        $this->assertContains('omega nested', $names);
     }
 
     public function testGetFilteredUsersByGroup()
@@ -125,10 +110,10 @@ class LDAPClientTest extends LDAPTestCase
         ]);
 
         $users = $client->getFilteredUsers(
-            ['grps' => 'admins'],
+            ['grps' => 'alpha'],
             Client::FILTER_EQUAL
         );
-        $this->assertArrayHasKey('alice', $users);
-        $this->assertArrayNotHasKey('bob', $users);
+        $this->assertArrayHasKey('m.barten', $users);
+        $this->assertArrayNotHasKey('m.mcnevin', $users);
     }
 }
