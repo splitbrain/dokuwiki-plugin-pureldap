@@ -154,7 +154,7 @@ class LDAPClient extends Client
         $template = $this->config['userfilter'] ?? '';
         if ($template !== '') {
             $placeholders = $this->userSearchPlaceholders($username);
-            $filterStr = FilterTemplate::substitute($template, $placeholders);
+            $filterStr = $this->substitute($template, $placeholders);
             try {
                 return FilterParser::parse($filterStr);
             } catch (FilterParseException $e) {
@@ -326,7 +326,7 @@ class LDAPClient extends Client
     {
         $template = $this->config['binddn'];
         if ($template === '') return $user;
-        return FilterTemplate::substitute($template, $this->userSearchPlaceholders($user));
+        return $this->substitute($template, $this->userSearchPlaceholders($user));
     }
 
     /** @inheritDoc */
@@ -526,7 +526,7 @@ class LDAPClient extends Client
         $placeholders['dn'] = $userentry->getDn()->toString();
         $placeholders['gid'] = $this->attr2str($userentry->get('gidNumber'));
 
-        $filterStr = FilterTemplate::substitute($template, $placeholders);
+        $filterStr = $this->substitute($template, $placeholders);
         try {
             $filter = FilterParser::parse($filterStr);
         } catch (FilterParseException $e) {
@@ -784,5 +784,32 @@ class LDAPClient extends Client
             $or->add(Filters::$filtermethod($key, $value));
         }
         return $or;
+    }
+
+    /**
+     * Substitute %{key} placeholders in a filter template with values
+     * from $placeholders.
+     *
+     * Mirrors authldap's long-standing template syntax. Unknown
+     * placeholders are left in the output untouched; array values are
+     * flattened to their first element; replacement values are
+     * RFC 4515-escaped so user-supplied input cannot break out of the
+     * filter.
+     *
+     * @param string $template
+     * @param array $placeholders
+     * @return string
+     */
+    protected function substitute($template, array $placeholders)
+    {
+        preg_match_all('/%\{([^}]+)\}/', $template, $matches, PREG_PATTERN_ORDER);
+        foreach ($matches[1] as $key) {
+            if (!array_key_exists($key, $placeholders)) continue;
+            $value = $placeholders[$key];
+            if (is_array($value)) $value = reset($value);
+            $value = Attribute::escape((string)$value);
+            $template = str_replace('%{' . $key . '}', $value, $template);
+        }
+        return $template;
     }
 }
