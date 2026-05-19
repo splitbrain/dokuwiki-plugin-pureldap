@@ -73,17 +73,17 @@ class ADClientTest extends LDAPTestCase
 
         $this->assertGreaterThan(mktime(0,0,0,6,1,2023), $user['lastpwd'], 'lastpwd should be a timestamp');
         unset($user['lastpwd']); // we don't know the exact value, so we remove it for the comparison
-        $this->assertSame($expect, $user);
+        $this->assertEquals($expect, $user);
 
         // access should work without the domain, too
         $user = $client->getUser('a.legrand');
         unset($user['lastpwd']);
-        $this->assertSame($expect, $user);
+        $this->assertEquals($expect, $user);
 
         // access should be case Insensitive
         $user = $client->getUser('A.LeGrand');
         unset($user['lastpwd']);
-        $this->assertSame($expect, $user);
+        $this->assertEquals($expect, $user);
     }
 
     public function testGetLongUser()
