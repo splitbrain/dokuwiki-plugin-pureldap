@@ -58,7 +58,7 @@ abstract class LDAPTestCase extends \DokuWikiTest
         foreach (file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
             $line = trim($line);
             if ($line === '' || $line[0] === '#') continue;
-            if (!str_contains($line, '=')) continue;
+            if (strpos($line, '=') === false) continue;
             [$key, $value] = explode('=', $line, 2);
             $key = trim($key);
             if ($key === '' || getenv($key) !== false) continue;
