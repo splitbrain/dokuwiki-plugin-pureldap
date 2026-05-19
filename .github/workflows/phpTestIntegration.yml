@@ -1,0 +1,82 @@
+name: Integration tests
+
+# 'docker compose up -d --wait' is the entire fixture setup: both LDAP
+# services bring themselves up, run provision.py via their post_start
+# hook, and their healthchecks gate on the sentinel file the script
+# drops when it finishes. By the time --wait returns both backends are
+# populated and phpunit can run.
+
+on: [push, pull_request]
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    integration:
+        name: Integration (PHP ${{ matrix.php-version }}, DokuWiki ${{ matrix.dokuwiki-branch }})
+        runs-on: ubuntu-latest
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+
+        strategy:
+            fail-fast: false
+            matrix:
+                php-version: ['8.2']
+                dokuwiki-branch: ['master']
+
+        env:
+            COMPOSER: _test/composer.json
+            COMPOSER_VENDOR_DIR: _test/vendor
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup PHP
+              uses: shivammathur/setup-php@v2
+              with:
+                  php-version: ${{ matrix.php-version }}
+                  extensions: mbstring, intl, PDO, pdo_sqlite, bz2
+
+            - name: Setup problem matchers
+              run: |
+                echo ::add-matcher::${{ runner.tool_cache }}/php.json
+                echo ::add-matcher::${{ runner.tool_cache }}/phpunit.json
+
+            - name: Bring up fixtures
+              # Compose handles everything: tls-init generates the cert,
+              # both LDAP services come up, their post_start hooks run
+              # setup.sh + provision.py, and the sentinel-file healthcheck
+              # gates --wait so this step blocks until both backends are
+              # fully populated.
+              run: |
+                docker compose -f _test/docker-compose.yml up -d --wait
+                docker compose -f _test/docker-compose.yml ps
+
+            - name: Create DokuWiki environment
+              uses: dokuwiki/github-action/.github/actions/dokuenv@main
+              with:
+                  branch: ${{ matrix.dokuwiki-branch }}
+
+            - name: Install composer dependencies
+              run: composer install --no-progress --no-interaction --prefer-dist --optimize-autoloader --no-scripts
+
+            - name: Run OpenLDAP tests
+              env:
+                  LDAP_TEST_HOST: localhost
+                  LDAP_TEST_PORT: 1389
+                  LDAP_TEST_PORT_SSL: 1636
+              run: composer exec -- phpunit -c _test/phpunit.xml --verbose --stderr --group plugin_pureldap_ldap
+
+            - name: Run Samba AD tests
+              env:
+                  AD_TEST_HOST: localhost
+                  AD_TEST_PORT: 7389
+                  AD_TEST_PORT_SSL: 7636
+              run: composer exec -- phpunit -c _test/phpunit.xml --verbose --stderr --group plugin_pureldap_ad
+
+            - name: Dump fixture logs on failure
+              if: failure()
+              run: |
+                docker compose -f _test/docker-compose.yml ps -a
+                docker compose -f _test/docker-compose.yml logs --tail=300 || true

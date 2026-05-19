@@ -1,0 +1,17 @@
+name: DokuWiki Default Tasks
+
+on:
+    push:
+    pull_request:
+
+# Cancel any prior queued/running run for the same branch on a new push.
+# Without this, both the push and pull_request triggers for an in-repo
+# PR queue independent runs of the reusable workflow, and orphans can
+# stick around for hours when runner allocation flakes.
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    all:
+        uses: dokuwiki/github-action/.github/workflows/all.yml@main
