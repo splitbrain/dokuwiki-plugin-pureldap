@@ -5,6 +5,7 @@ namespace dokuwiki\plugin\pureldap\classes;
 use dokuwiki\PassHash;
 use dokuwiki\Utf8\PhpString;
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\FilterParseException;
@@ -712,18 +713,39 @@ class LDAPClient extends Client
     }
 
     /**
-     * Extract a group's short name from its DN by stripping the leading
-     * attribute name (CN= / uid= / etc.) from the first RDN.
+     * Extract a group's short name from its DN by taking the value of the
+     * first RDN. Uses the FreeDSx DN parser so escaped commas (`CN=Smith\,
+     * John,OU=...`) and hex-escaped characters are handled per RFC 4514.
      *
      * @param string $dn
      * @return string
      */
     protected function dn2group($dn)
     {
-        [$rdn] = explode(',', $dn, 2);
-        $eq = strpos($rdn, '=');
-        if ($eq === false) return $this->cleanGroup($rdn);
-        return $this->cleanGroup(substr($rdn, $eq + 1));
+        try {
+            $value = (new Dn($dn))->getRdn()->getValue();
+        } catch (\Exception $e) {
+            return $this->cleanGroup($dn);
+        }
+        return $this->cleanGroup($this->unescapeRdnValue($value));
+    }
+
+    /**
+     * Decode RFC 4514 escape sequences in an RDN value. Supports both the
+     * `\XX` hex form and the `\X` single-character form.
+     *
+     * @param string $value
+     * @return string
+     */
+    protected function unescapeRdnValue($value)
+    {
+        return (string)preg_replace_callback(
+            '/\\\\([0-9A-Fa-f]{2}|.)/s',
+            static function ($m) {
+                return strlen($m[1]) === 2 ? chr(hexdec($m[1])) : $m[1];
+            },
+            $value
+        );
     }
 
     /**
