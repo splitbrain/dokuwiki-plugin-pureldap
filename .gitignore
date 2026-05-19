@@ -7,3 +7,4 @@ vendor/**/*.yml
 vendor/**/*.dist
 vendor/freedsx/sasl/docs
 _test/fixtures/__pycache__/
+_test/.env
