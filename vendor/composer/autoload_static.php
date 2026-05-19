@@ -23,7 +23,7 @@ class ComposerStaticInit4dc77faa3459161bbb3efea2ab35aaa9
     public static $prefixDirsPsr4 = array (
         'Psr\\Log\\' => 
         array (
-            0 => __DIR__ . '/..' . '/psr/log/Psr/Log',
+            0 => __DIR__ . '/..' . '/psr/log/src',
         ),
         'FreeDSx\\Socket\\' => 
         array (
