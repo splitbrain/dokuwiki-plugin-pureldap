@@ -163,10 +163,9 @@ class LDAPClient extends Client
             }
         }
 
-        $username = $this->cleanUser($username);
         return Filters::and(
             Filters::equal('objectClass', $this->config['userClass']),
-            Filters::equal($this->config['userkey'], $username)
+            $this->orOverKeys('userkey', $username, self::FILTER_EQUAL, true)
         );
     }
 

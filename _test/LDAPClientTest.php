@@ -116,6 +116,27 @@ class LDAPClientTest extends LDAPTestCase
         $this->assertContains('omega nested', $names);
     }
 
+    public function testGetUserFallbackWithSingleUserkey()
+    {
+        // Sanity-check the fallback path: no userfilter, single-attr userkey.
+        $client = $this->getClient(['userfilter' => '', 'userkey' => 'uid']);
+        $user = $client->getUser('a.legrand');
+        $this->assertIsArray($user);
+        $this->assertSame('a.legrand', $user['user']);
+    }
+
+    public function testGetUserFallbackWithCommaUserkeyList()
+    {
+        // Regression: buildUserSearchFilter() used to pass the raw
+        // comma-list into Filters::equal(), producing an invalid
+        // (mail,uid=a.legrand) attribute description and silently
+        // returning null. With the fix it OR-expands across the keys.
+        $client = $this->getClient(['userfilter' => '', 'userkey' => 'mail,uid']);
+        $user = $client->getUser('a.legrand');
+        $this->assertIsArray($user, 'Comma-list userkey must OR across the attributes');
+        $this->assertSame('a.legrand@example.com', $user['mail']);
+    }
+
     public function testAuthenticateOverSsl()
     {
         $sslPort = $this->getSslPort();
