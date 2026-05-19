@@ -13,6 +13,30 @@ use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\LdapClient;
 
+/**
+ * Base class for LDAP-backed auth clients.
+ *
+ * LDAP-aware but schema- and search-strategy-agnostic: it knows there is a
+ * FreeDSx LdapClient, that authentication happens through binding, and that
+ * passwords are written by mutating an Entry — but not which attributes
+ * carry which meaning, what filters to use, or how to decode an Entry into
+ * a DokuWiki user record. Those concerns belong to {@see LDAPClient}.
+ *
+ * Responsibilities kept here:
+ *  - the public capability surface as abstract methods (getUser, getGroups,
+ *    cleanUser, userAttributes, passwordAttribute, encodePassword, ...)
+ *  - LDAP connection plumbing identical across directory flavours: bind
+ *    state, bindAs(), TLS startup, autoAuth(), the default authenticate()
+ *  - cross-cutting concerns: config loading, SSO prep, memory+fs caching,
+ *    error/debug/fatal helpers
+ *  - template-method orchestration whose shape doesn't change per
+ *    directory while its steps do — most clearly setPassword(), which
+ *    locates the entry, optionally re-binds for self-service, delegates
+ *    the actual write to applyPasswordChange(), then calls update()
+ *  - conservative defaults for capability flags (canModPass=false,
+ *    supportsPasswordExpiry=false, translateBindException=null,
+ *    getMaxPasswordAge=0) that subclasses lift as they support more.
+ */
 abstract class Client
 {
     public const FILTER_EQUAL = 'equal';
@@ -267,6 +291,16 @@ abstract class Client
      * @return null|array
      */
     abstract public function getUser($username, $fetchgroups = true);
+
+    /**
+     * Fetch users matching the given filters
+     *
+     * @param array $match Keyed by 'user', 'name', 'mail', 'grps'; any
+     *                     subset may be omitted.
+     * @param string $filtermethod one of the FILTER_* constants
+     * @return array map of username → user info array
+     */
+    abstract public function getFilteredUsers($match, $filtermethod = self::FILTER_EQUAL);
 
     /**
      * Fetch the raw LDAP entry for a user

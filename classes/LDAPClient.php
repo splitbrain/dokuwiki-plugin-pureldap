@@ -17,19 +17,35 @@ use FreeDSx\Ldap\Search\FilterParser;
 use FreeDSx\Ldap\Search\Filters;
 
 /**
- * Universal LDAP client.
+ * Universal LDAP client — the search & decode layer.
  *
- * Implements the generic side of every {@see Client} contract using
- * configurable filter and attribute names. Active Directory and other
- * directory flavours specialise this class by seeding their own defaults
- * (see {@see ADClient}) and, where needed, overriding a small set of hook
- * methods for protocol details that cannot be reduced to configuration.
+ * Implements every {@see Client} abstract in terms of FreeDSx search/filter
+ * operations driven by a configurable schema (userkey, userClass,
+ * memberof_attr, ...). The same code works against OpenLDAP, 389DS, Samba,
+ * Active Directory, etc.; flavour-specific subclasses only need to seed
+ * different defaults and override the hooks below for behaviour that no
+ * amount of configuration can express.
+ *
+ * Concerns owned by this layer:
+ *  - building user/group search filters from templates or from
+ *    structural defaults (userkey + userClass)
+ *  - search scope/base resolution and paged result iteration
+ *  - mapping an LDAP Entry into the DokuWiki user info array
+ *  - group resolution strategies: memberof, grouptree (RFC 2307), none,
+ *    plus auto-detection and optional recursive expansion
+ *  - the search-then-bind fallback when no direct-bind identifier
+ *    template is configured
+ *  - RDN parsing/unescaping per RFC 4514 and RFC 4515 value escaping in
+ *    filter templates
  *
  * Hooks intended for subclass override:
- *  - extractLastpwd(Entry): int
- *  - extractExpires(Entry): bool
- *  - additionalGroups(Entry): string[]
- *  - groupMembershipFilter(string $dn): FilterInterface
+ *  - usesDirectBind(): bool                       — skip search-then-bind
+ *  - userSearchPlaceholders(string $u): array     — add filter placeholders
+ *  - extractLastpwd(Entry): int                   — password-age timestamp
+ *  - extractExpires(Entry): bool                  — expiry policy flag
+ *  - additionalGroups(Entry): string[]            — extra group memberships
+ *  - groupMembershipFilter(string $dn): Filter    — clause for member-of-group searches
+ *  - groupHierarchyFilter(): Filter               — filter for hierarchy cache
  */
 class LDAPClient extends Client
 {
@@ -229,13 +245,7 @@ class LDAPClient extends Client
         return $groups;
     }
 
-    /**
-     * Fetch users matching the given filters
-     *
-     * @param array $match
-     * @param string $filtermethod
-     * @return array
-     */
+    /** @inheritDoc */
     public function getFilteredUsers($match, $filtermethod = self::FILTER_EQUAL)
     {
         if (!$this->autoAuth()) return [];

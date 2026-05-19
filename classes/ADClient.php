@@ -12,12 +12,23 @@ use FreeDSx\Ldap\Search\Filters;
 /**
  * Active Directory specialisation of {@see LDAPClient}.
  *
- * Pre-seeds AD's standard schema as defaults (userPrincipalName +
- * sAMAccountName, displayName + Name, memberOf, objectClass=user/group)
- * and overrides the handful of methods that depend on real AD protocol:
- * UTF-16LE-encoded unicodePwd, FILETIME-based password expiry, the
- * primaryGroupID=513 "Domain Users" RID trick, and AD's bind error
- * sub-code table.
+ * Carries only what configurable schema cannot express — the AD protocol
+ * quirks proper. Schema choices that can be expressed as config defaults
+ * (userPrincipalName + sAMAccountName, displayName + Name, memberOf,
+ * objectClass=user/group, the seeded userfilter) are seeded in
+ * prepareConfig() and then handled by the generic LDAPClient code.
+ *
+ * AD-specific behaviour overridden here:
+ *  - UTF-16LE-encoded unicodePwd, with the delete-then-add modify dance
+ *    required for self-service password changes
+ *  - pwdlastset FILETIME (100-ns intervals since 1601) → Unix epoch
+ *  - useraccountcontrol DONT_EXPIRE_PASSWD bit → expiry flag
+ *  - primaryGroupID=513 "Domain Users" RID trick, both when reading a
+ *    user's groups and when searching members of the primary group
+ *  - UPN-suffix binding (user@suffix) for both user and admin binds,
+ *    forcing direct-bind authentication
+ *  - maxPwdAge lookup at the domain root
+ *  - AD bind error sub-code table ("data XXX") for translateBindException
  */
 class ADClient extends LDAPClient
 {
