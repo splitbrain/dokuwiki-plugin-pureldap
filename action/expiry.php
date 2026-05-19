@@ -15,9 +15,12 @@ class action_plugin_pureldap_expiry extends ActionPlugin
     /** @inheritDoc */
     public function register(EventHandler $controller)
     {
-        global $conf;
+        global $conf, $auth;
         // the plugin might be enabled, but not used
         if ($conf['authtype'] !== 'authpureldap') return;
+        // generic LDAP backends don't carry maxPwdAge-style policy, so the
+        // hook would always short-circuit. Skip registration entirely.
+        if (!isset($auth->client) || !$auth->client->supportsPasswordExpiry()) return;
 
         $controller->register_hook('DOKUWIKI_STARTED', 'AFTER', $this, 'handlePasswordExpiry');
     }

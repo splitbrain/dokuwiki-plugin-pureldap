@@ -6,30 +6,62 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
 
 /**
- * Keeps a copy of all AD groups and provides recursive operations
+ * Keeps a copy of all groups and provides recursive operations.
  *
- * All groups are cached as full DN here
+ * All groups are cached by their full DN. Active Directory and generic LDAP
+ * servers expose group hierarchies via the same `memberOf` chain pattern;
+ * this class is parameterised so that subclasses of {@see Client} can supply
+ * their own search filter and attribute names.
  */
 class GroupHierarchyCache
 {
     /** @var LdapClient */
     protected $ldap;
 
+    /** @var FilterInterface */
+    protected $filter;
+
+    /** @var string */
+    protected $parentAttr;
+
+    /** @var string */
+    protected $nameAttr;
+
+    /** @var string */
+    protected $cacheKey;
+
     /** @var array List of group DNs and their parent and children */
     protected $groupHierarchy;
 
     /**
-     * GroupHierarchyCache constructor.
-     *
      * @param LdapClient $ldap
      * @param bool $usefs Use filesystem caching?
+     * @param FilterInterface|null $filter Search filter used to enumerate groups;
+     *        defaults to AD's `(objectCategory=group)` which also matches generic
+     *        LDAP installs that don't set objectCategory explicitly.
+     * @param string $parentAttr Multi-valued attribute on each group entry that
+     *        lists the parent groups. Defaults to the standard `memberOf`.
+     * @param string $nameAttr Attribute holding the group's canonical name.
+     *        Currently informational; the cache keys off DN.
+     * @param string $cacheKey Filesystem cache namespace.
      */
-    public function __construct(LdapClient $ldap, $usefs)
-    {
+    public function __construct(
+        LdapClient $ldap,
+        $usefs,
+        FilterInterface $filter = null,
+        $parentAttr = 'memberOf',
+        $nameAttr = 'cn',
+        $cacheKey = 'grouphierarchy'
+    ) {
         $this->ldap = $ldap;
+        $this->filter = $filter ?? Filters::equal('objectCategory', 'group');
+        $this->parentAttr = $parentAttr;
+        $this->nameAttr = $nameAttr;
+        $this->cacheKey = $cacheKey;
 
         if ($usefs) {
             $this->groupHierarchy = $this->getCachedGroupList();
@@ -49,7 +81,7 @@ class GroupHierarchyCache
     {
         global $conf;
 
-        $cachename = getcachename('grouphierarchy', '.pureldap-gch');
+        $cachename = getcachename($this->cacheName(), '.pureldap-gch');
         $cachetime = @filemtime($cachename);
 
         // valid file system cache? use it
@@ -64,14 +96,25 @@ class GroupHierarchyCache
     }
 
     /**
-     * Load all group information from AD
+     * Filesystem cache key. Includes a short hash of the filter and parent
+     * attribute so different directory layouts don't share cache files.
+     *
+     * @return string
+     */
+    protected function cacheName()
+    {
+        $signature = substr(md5($this->filter->toString() . '|' . $this->parentAttr), 0, 8);
+        return $this->cacheKey . '-' . $signature;
+    }
+
+    /**
+     * Load all group information from the directory.
      *
      * @return array
      */
     protected function getGroupList()
     {
-        $filter = Filters::equal('objectCategory', 'group');
-        $search = Operations::search($filter, 'memberOf', 'cn');
+        $search = Operations::search($this->filter, $this->parentAttr, $this->nameAttr);
         $paging = $this->ldap->paging($search);
 
         $groups = [];
@@ -85,9 +128,11 @@ class GroupHierarchyCache
             /** @var Entry $entry */
             foreach ($entries as $entry) {
                 $dn = (string)$entry->getDn();
-                $groups[$dn] = [];
-                if ($entry->has('memberOf')) {
-                    $parents = $entry->get('memberOf')->getValues();
+                // Don't blow away a children list a prior iteration already
+                // built up when this group was reached as someone's parent.
+                if (!isset($groups[$dn])) $groups[$dn] = [];
+                if ($entry->has($this->parentAttr)) {
+                    $parents = $entry->get($this->parentAttr)->getValues();
                     $groups[$dn]['parents'] = $parents;
                     foreach ($parents as $parent) {
                         $groups[$parent]['children'][] = $dn;
