@@ -5,6 +5,7 @@ namespace dokuwiki\plugin\pureldap\classes;
 use dokuwiki\ErrorHandler;
 use dokuwiki\Logger;
 use dokuwiki\Utf8\Clean;
+use dokuwiki\Utf8\Conversion;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
@@ -40,8 +41,6 @@ abstract class Client
      */
     public function __construct($config)
     {
-        require_once __DIR__ . '/../vendor/autoload.php';
-
         $this->config = $this->prepareConfig($config);
         $this->prepareSSO();
         $this->ldap = new LdapClient($this->config);
@@ -99,7 +98,7 @@ abstract class Client
                 $user = mb_convert_encoding($user, 'UTF-8', $this->config['sso_charset']);
             }
         } elseif (!Clean::isUtf8($user)) {
-            $user = utf8_encode($user);
+            $user = Conversion::fromLatin1($user);
         }
         $user = $this->cleanUser($user);
 

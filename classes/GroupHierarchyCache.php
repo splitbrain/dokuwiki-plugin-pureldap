@@ -2,6 +2,7 @@
 
 namespace dokuwiki\plugin\pureldap\classes;
 
+use dokuwiki\Cache\Cache;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\LdapClient;
@@ -31,9 +32,6 @@ class GroupHierarchyCache
     /** @var string */
     protected $nameAttr;
 
-    /** @var string */
-    protected $cacheKey;
-
     /** @var array List of group DNs and their parent and children */
     protected $groupHierarchy;
 
@@ -47,21 +45,18 @@ class GroupHierarchyCache
      *        lists the parent groups. Defaults to the standard `memberOf`.
      * @param string $nameAttr Attribute holding the group's canonical name.
      *        Currently informational; the cache keys off DN.
-     * @param string $cacheKey Filesystem cache namespace.
      */
     public function __construct(
         LdapClient $ldap,
         $usefs,
         FilterInterface $filter = null,
         $parentAttr = 'memberOf',
-        $nameAttr = 'cn',
-        $cacheKey = 'grouphierarchy'
+        $nameAttr = 'cn'
     ) {
         $this->ldap = $ldap;
         $this->filter = $filter ?? Filters::equal('objectCategory', 'group');
         $this->parentAttr = $parentAttr;
         $this->nameAttr = $nameAttr;
-        $this->cacheKey = $cacheKey;
 
         if ($usefs) {
             $this->groupHierarchy = $this->getCachedGroupList();
@@ -73,7 +68,8 @@ class GroupHierarchyCache
     /**
      * Use a file system cached version of the group hierarchy
      *
-     * The cache expires after $conf['auth_security_timeout']
+     * Cached for at most $conf['auth_security_timeout'] seconds, and
+     * invalidated automatically when any DokuWiki config file changes.
      *
      * @return array
      */
@@ -81,30 +77,19 @@ class GroupHierarchyCache
     {
         global $conf;
 
-        $cachename = getcachename($this->cacheName(), '.pureldap-gch');
-        $cachetime = @filemtime($cachename);
+        $cache = new Cache('pureldap-grouphierarchy', '.json');
+        $depends = [
+            'age' => $conf['auth_security_timeout'],
+            'files' => getConfigFiles('main'),
+        ];
 
-        // valid file system cache? use it
-        if ($cachetime && (time() - $cachetime) < $conf['auth_security_timeout']) {
-            return json_decode(file_get_contents($cachename), true, 512, JSON_THROW_ON_ERROR);
+        if ($cache->useCache($depends)) {
+            return json_decode($cache->retrieveCache(false), true, 512, JSON_THROW_ON_ERROR);
         }
 
-        // get fresh data and store in cache
         $groups = $this->getGroupList();
-        file_put_contents($cachename, json_encode($groups, JSON_THROW_ON_ERROR));
+        $cache->storeCache(json_encode($groups, JSON_THROW_ON_ERROR));
         return $groups;
-    }
-
-    /**
-     * Filesystem cache key. Includes a short hash of the filter and parent
-     * attribute so different directory layouts don't share cache files.
-     *
-     * @return string
-     */
-    protected function cacheName()
-    {
-        $signature = substr(md5($this->filter->toString() . '|' . $this->parentAttr), 0, 8);
-        return $this->cacheKey . '-' . $signature;
     }
 
     /**

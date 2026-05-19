@@ -88,7 +88,7 @@ class LDAPClient extends Client
         }
 
         if (!$this->autoAuth()) {
-            throw new BindException('Cannot resolve user without admin credentials', 49);
+            throw new BindException('Cannot resolve user: directory bind failed', 49);
         }
         $entry = $this->getUserEntry($user);
         if ($entry === null) {

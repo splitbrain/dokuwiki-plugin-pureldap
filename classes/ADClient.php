@@ -55,8 +55,10 @@ class ADClient extends LDAPClient
     }
 
     /**
-     * AD requires a delete-then-add modify for self-service password changes;
-     * a simple replace only works when acting as a privileged admin.
+     * A non-null $oldpass marks a self-service password change (the user
+     * changing their own password). AD requires this to be expressed as a
+     * delete-then-add modify; a simple replace only works when acting as
+     * a privileged admin (when $oldpass is null).
      *
      * @inheritDoc
      */
