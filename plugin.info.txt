@@ -5,3 +5,4 @@ date   2026-05-15
 name   pureldap plugin
 desc   Universal LDAP auth plugin (Active Directory and generic LDAP)
 url    https://www.dokuwiki.org/plugin:pureldap
+phpmin 8.2
