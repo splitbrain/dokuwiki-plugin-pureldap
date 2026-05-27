@@ -5,13 +5,38 @@ namespace dokuwiki\plugin\pureldap\classes;
 use dokuwiki\ErrorHandler;
 use dokuwiki\Logger;
 use dokuwiki\Utf8\Clean;
-use dokuwiki\Utf8\PhpString;
+use dokuwiki\Utf8\Conversion;
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\LdapClient;
 
+/**
+ * Base class for LDAP-backed auth clients.
+ *
+ * LDAP-aware but schema- and search-strategy-agnostic: it knows there is a
+ * FreeDSx LdapClient, that authentication happens through binding, and that
+ * passwords are written by mutating an Entry — but not which attributes
+ * carry which meaning, what filters to use, or how to decode an Entry into
+ * a DokuWiki user record. Those concerns belong to {@see LDAPClient}.
+ *
+ * Responsibilities kept here:
+ *  - the public capability surface as abstract methods (getUser, getGroups,
+ *    cleanUser, userAttributes, passwordAttribute, encodePassword, ...)
+ *  - LDAP connection plumbing identical across directory flavours: bind
+ *    state, bindAs(), TLS startup, autoAuth(), the default authenticate()
+ *  - cross-cutting concerns: config loading, SSO prep, memory+fs caching,
+ *    error/debug/fatal helpers
+ *  - template-method orchestration whose shape doesn't change per
+ *    directory while its steps do — most clearly setPassword(), which
+ *    locates the entry, optionally re-binds for self-service, delegates
+ *    the actual write to applyPasswordChange(), then calls update()
+ *  - conservative defaults for capability flags (canModPass=false,
+ *    supportsPasswordExpiry=false, translateBindException=null,
+ *    getMaxPasswordAge=0) that subclasses lift as they support more.
+ */
 abstract class Client
 {
     public const FILTER_EQUAL = 'equal';
@@ -40,8 +65,6 @@ abstract class Client
      */
     public function __construct($config)
     {
-        require_once __DIR__ . '/../vendor/autoload.php';
-
         $this->config = $this->prepareConfig($config);
         $this->prepareSSO();
         $this->ldap = new LdapClient($this->config);
@@ -76,9 +99,6 @@ abstract class Client
             $config['ssl_allow_self_signed'] = true;
         }
 
-        $config['suffix'] = ltrim(PhpString::strtolower($config['suffix']), '@');
-        $config['primarygroup'] = $this->cleanGroup($config['primarygroup']);
-
         return $config;
     }
 
@@ -102,7 +122,7 @@ abstract class Client
                 $user = mb_convert_encoding($user, 'UTF-8', $this->config['sso_charset']);
             }
         } elseif (!Clean::isUtf8($user)) {
-            $user = utf8_encode($user);
+            $user = Conversion::fromLatin1($user);
         }
         $user = $this->cleanUser($user);
 
@@ -140,9 +160,9 @@ abstract class Client
     {
         if ($this->isAuthenticated) return true;
 
-        $user = $this->prepareBindUser($this->config['admin_username']);
+        $user = $this->prepareAdminBindUser($this->config['admin_username']);
         try {
-            $this->authenticate($user, $this->config['admin_password']);
+            $this->bindAs($user, $this->config['admin_password']);
             return true;
         } catch (\Exception $e) {
             $this->error('Automatic bind failed. Probably wrong user/password.', __FILE__, __LINE__);
@@ -151,11 +171,10 @@ abstract class Client
     }
 
     /**
-     * Authenticates a given user. This client will remain authenticated
+     * Authenticates a given user. This client will remain authenticated.
      *
      * @param string $user
      * @param string $pass
-     * @noinspection PhpRedundantCatchClauseInspection
      * @return true
      * @throws ConnectionException
      * @throws OperationException
@@ -163,30 +182,57 @@ abstract class Client
      */
     public function authenticate($user, $pass)
     {
-        $user = $this->prepareBindUser($user);
+        return $this->bindAs($this->prepareBindUser($user), $pass);
+    }
+
+    /**
+     * Issue a simple bind with the given identifier (DN, UPN, or whatever
+     * the directory accepts) without further transformation.
+     *
+     * @param string $identifier
+     * @param string $pass
+     * @return true
+     * @throws BindException
+     * @throws ConnectionException
+     * @throws OperationException
+     */
+    protected function bindAs($identifier, $pass)
+    {
         $this->isAuthenticated = false;
 
         if (!$this->ldap->isConnected() && $this->config['encryption'] === 'tls') {
             try {
                 $this->ldap->startTls();
-            } catch (ConnectionException|OperationException $e) {
+            } catch (ConnectionException | OperationException $e) {
                 $this->fatal($e);
                 throw $e;
             }
         }
 
         try {
-            $this->ldap->bind($user, $pass);
+            $this->ldap->bind($identifier, $pass);
         } catch (BindException $e) {
-            $this->debug("Bind for $user failed: " . $e->getMessage(), $e->getFile(), $e->getLine());
+            $this->debug("Bind for $identifier failed: " . $e->getMessage(), $e->getFile(), $e->getLine());
             throw $e;
-        } catch (ConnectionException|OperationException $e) {
+        } catch (ConnectionException | OperationException $e) {
             $this->fatal($e);
             throw $e;
         }
 
-        $this->isAuthenticated = $user;
+        $this->isAuthenticated = $identifier;
         return true;
+    }
+
+    /**
+     * How to transform admin_username before binding. Defaults to identity;
+     * Active Directory overrides to apply UPN suffix.
+     *
+     * @param string $admin
+     * @return string
+     */
+    protected function prepareAdminBindUser($admin)
+    {
+        return $admin;
     }
 
     /**
@@ -247,14 +293,133 @@ abstract class Client
     abstract public function getUser($username, $fetchgroups = true);
 
     /**
+     * Fetch users matching the given filters
+     *
+     * @param array $match Keyed by 'user', 'name', 'mail', 'grps'; any
+     *                     subset may be omitted.
+     * @param string $filtermethod one of the FILTER_* constants
+     * @return array map of username → user info array
+     */
+    abstract public function getFilteredUsers($match, $filtermethod = self::FILTER_EQUAL);
+
+    /**
+     * Fetch the raw LDAP entry for a user
+     *
+     * @param string $username
+     * @return Entry|null
+     */
+    abstract public function getUserEntry($username);
+
+    /**
+     * Name of the LDAP attribute that holds the user password.
+     *
+     * @return string
+     */
+    abstract protected function passwordAttribute();
+
+    /**
+     * Encode a plain text password for transmission to the LDAP server.
+     *
+     * @param string $password
+     * @return string
+     */
+    abstract protected function encodePassword($password);
+
+    /**
      * Set a new password for a user
+     *
+     * Template method: looks up the user entry, optionally re-binds as the
+     * user for self-service changes, and delegates the actual attribute
+     * modification to {@see applyPasswordChange()}.
      *
      * @param string $username
      * @param string $newpass
-     * @param string $oldpass Needed for self-service password change in AD
+     * @param string|null $oldpass Needed for self-service password change in AD
      * @return bool
      */
-    abstract public function setPassword($username, $newpass, $oldpass = null);
+    public function setPassword($username, $newpass, $oldpass = null)
+    {
+        if (!$this->autoAuth()) return false;
+
+        $entry = $this->getUserEntry($username);
+        if ($entry === null) {
+            $this->error("User '$username' not found", __FILE__, __LINE__);
+            return false;
+        }
+
+        if ($oldpass) {
+            // self-service password change: bind as the user themselves
+            if ($this->isAuthenticated !== $this->prepareBindUser($username)) {
+                try {
+                    $this->authenticate($username, $oldpass);
+                } catch (\Exception $e) {
+                    $this->error("Old password for '$username' is wrong", __FILE__, __LINE__);
+                    return false;
+                }
+            }
+        }
+
+        $this->applyPasswordChange($entry, $newpass, $oldpass);
+
+        try {
+            $this->ldap->update($entry);
+        } catch (OperationException $e) {
+            $this->fatal($e);
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Apply the password change to the user entry.
+     *
+     * Default implementation does a simple attribute replace. Subclasses with
+     * protocol-specific requirements (e.g. Active Directory's mandatory
+     * delete-then-add dance for self-service changes) override this.
+     *
+     * @param Entry $entry
+     * @param string $newpass
+     * @param string|null $oldpass
+     * @return void
+     */
+    protected function applyPasswordChange(Entry $entry, $newpass, $oldpass)
+    {
+        $entry->set($this->passwordAttribute(), $this->encodePassword($newpass));
+    }
+
+    /**
+     * Translate a bind exception into a localisable user-facing message.
+     *
+     * @param \Exception $e
+     * @return array|null Either null when no translation is available, or an
+     *                   array with keys 'key' (language string key) and
+     *                   'allowReset' (whether to offer a password reset link).
+     */
+    public function translateBindException(\Exception $e)
+    {
+        return null;
+    }
+
+    /**
+     * Whether this client supports changing user passwords with the current
+     * configuration. Drives the auth plugin's modPass capability flag.
+     *
+     * @return bool
+     */
+    public function canModPass()
+    {
+        return false;
+    }
+
+    /**
+     * Whether this client can report password expiry information.
+     *
+     * @return bool
+     */
+    public function supportsPasswordExpiry()
+    {
+        return false;
+    }
 
     /**
      * Return a list of all available groups, use cache if available
@@ -325,26 +490,11 @@ abstract class Client
     }
 
     /**
-     * Get the attributes that should be fetched for a user
-     *
-     * Can be extended in sub classes
+     * Get the attributes to fetch when looking up a user entry.
      *
      * @return Attribute[]
      */
-    protected function userAttributes()
-    {
-        // defaults
-        $attr = [
-            new Attribute('dn'),
-            new Attribute('displayName'),
-            new Attribute('mail'),
-        ];
-        // additionals
-        foreach ($this->config['attributes'] as $attribute) {
-            $attr[] = new Attribute($attribute);
-        }
-        return $attr;
-    }
+    abstract protected function userAttributes();
 
     /**
      * Get the maximum age a password may have before it needs to be changed

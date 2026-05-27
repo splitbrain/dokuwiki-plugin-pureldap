@@ -4,9 +4,14 @@ namespace dokuwiki\plugin\pureldap\test;
 
 /**
  * @group plugin_pureldap
+ * @group plugin_pureldap_ad
  * @group plugins
  */
-class AuthTest extends \DokuWikiTest {
+class AuthTest extends LDAPTestCase {
+
+    protected const HOST_ENV = 'AD_TEST_HOST';
+    protected const PORT_ENV = 'AD_TEST_PORT_SSL';
+    protected const DEFAULT_PORT = 7636;
 
     public function setUp(): void
     {
@@ -14,10 +19,10 @@ class AuthTest extends \DokuWikiTest {
 
         global $conf;
         $conf['auth'] = 'pureldap';
-        $conf['plugin']['pureldap']['base_dn'] = 'DC=example,DC=local';
+        $conf['plugin']['pureldap']['base_dn'] = 'dc=example,dc=local';
         $conf['plugin']['pureldap']['suffix'] = 'example.local';
-        $conf['plugin']['pureldap']['servers'] = ['localhost'];
-        $conf['plugin']['pureldap']['port'] = 7636;
+        $conf['plugin']['pureldap']['servers'] = [$this->ldapHost];
+        $conf['plugin']['pureldap']['port'] = $this->ldapPort;
         $conf['plugin']['pureldap']['admin_username'] = 'vagrant';
         $conf['plugin']['pureldap']['admin_password'] = 'vagrant';
         $conf['plugin']['pureldap']['encryption'] = 'ssl';

@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f28e8f490414ae13e83fa29ac4abe2ad",
+    "content-hash": "a5d205c04fb0f9b0fe5339f27c7a3eab",
     "packages": [
         {
             "name": "freedsx/asn1",
-            "version": "0.4.7",
+            "version": "0.4.8",
             "source": {
                 "type": "git",
                 "url": "https://github.com/FreeDSx/ASN1.git",
-                "reference": "aea7159cb82f6567143db4ba6fd119e8f791c3fb"
+                "reference": "a136e7981d2ca76b140570834bd65debf42ee3da"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/FreeDSx/ASN1/zipball/aea7159cb82f6567143db4ba6fd119e8f791c3fb",
-                "reference": "aea7159cb82f6567143db4ba6fd119e8f791c3fb",
+                "url": "https://api.github.com/repos/FreeDSx/ASN1/zipball/a136e7981d2ca76b140570834bd65debf42ee3da",
+                "reference": "a136e7981d2ca76b140570834bd65debf42ee3da",
                 "shasum": ""
             },
             "require": {
@@ -61,30 +61,30 @@
             ],
             "support": {
                 "issues": "https://github.com/FreeDSx/ASN1/issues",
-                "source": "https://github.com/FreeDSx/ASN1/tree/0.4.7"
+                "source": "https://github.com/FreeDSx/ASN1/tree/0.4.8"
             },
-            "time": "2023-06-06T16:47:22+00:00"
+            "time": "2024-10-13T15:35:35+00:00"
         },
         {
             "name": "freedsx/ldap",
-            "version": "0.8.0",
+            "version": "0.8.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/FreeDSx/LDAP.git",
-                "reference": "98cf7abe6762cd8062bde6f0bbd9bd8364e7d52a"
+                "reference": "b94be237daaa6f7144f9ff9a7fd158229597b784"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/FreeDSx/LDAP/zipball/98cf7abe6762cd8062bde6f0bbd9bd8364e7d52a",
-                "reference": "98cf7abe6762cd8062bde6f0bbd9bd8364e7d52a",
+                "url": "https://api.github.com/repos/FreeDSx/LDAP/zipball/b94be237daaa6f7144f9ff9a7fd158229597b784",
+                "reference": "b94be237daaa6f7144f9ff9a7fd158229597b784",
                 "shasum": ""
             },
             "require": {
-                "freedsx/asn1": "^0.4.0",
-                "freedsx/sasl": "^0.1.0",
-                "freedsx/socket": "^0.5.2",
+                "freedsx/asn1": ">=0.4,<1.0",
+                "freedsx/sasl": ">=0.1,<1.0",
+                "freedsx/socket": ">=0.5,<1.0",
                 "php": ">=7.1",
-                "psr/log": "^1|^2|^3"
+                "psr/log": "^1||^2||^3"
             },
             "require-dev": {
                 "friends-of-phpspec/phpspec-code-coverage": "^4.3|^6.1|dev-master",
@@ -125,31 +125,32 @@
             ],
             "support": {
                 "issues": "https://github.com/FreeDSx/LDAP/issues",
-                "source": "https://github.com/FreeDSx/LDAP/tree/0.8.0"
+                "source": "https://github.com/FreeDSx/LDAP/tree/0.8.1"
             },
-            "time": "2022-05-21T19:17:54+00:00"
+            "time": "2026-04-25T16:51:40+00:00"
         },
         {
             "name": "freedsx/sasl",
-            "version": "0.1.1",
+            "version": "0.2.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/FreeDSx/SASL.git",
-                "reference": "baffafed1a46bd6c28257bf5f8893df0663b158b"
+                "reference": "8dfa6e105f101960d9fa5f9c57d9c461d2c20593"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/FreeDSx/SASL/zipball/baffafed1a46bd6c28257bf5f8893df0663b158b",
-                "reference": "baffafed1a46bd6c28257bf5f8893df0663b158b",
+                "url": "https://api.github.com/repos/FreeDSx/SASL/zipball/8dfa6e105f101960d9fa5f9c57d9c461d2c20593",
+                "reference": "8dfa6e105f101960d9fa5f9c57d9c461d2c20593",
                 "shasum": ""
             },
             "require": {
                 "php": ">=7.1"
             },
             "require-dev": {
-                "phpstan/phpstan": "^0.11.12",
-                "phpunit/phpunit": "^7.0",
-                "symplify/easy-coding-standard": "^6.1"
+                "phpstan/phpstan": "^0.11|^0.12",
+                "phpunit/phpunit": "^7.0|^8.5|^9.5",
+                "symfony/polyfill-php80": "^1.27",
+                "symplify/easy-coding-standard": ">=6.1"
             },
             "suggest": {
                 "ext-openssl": "Needed for encryption for certain mechanisms."
@@ -179,32 +180,32 @@
             ],
             "support": {
                 "issues": "https://github.com/FreeDSx/SASL/issues",
-                "source": "https://github.com/FreeDSx/SASL/tree/0.1.1"
+                "source": "https://github.com/FreeDSx/SASL/tree/0.2.1"
             },
-            "time": "2019-12-10T01:45:19+00:00"
+            "time": "2026-03-22T23:50:16+00:00"
         },
         {
             "name": "freedsx/socket",
-            "version": "0.5.2",
+            "version": "0.6.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/FreeDSx/Socket.git",
-                "reference": "3a4949f39d87fe70a0fc838d47aaf0bf8c900c3e"
+                "reference": "d0c8c6f684582e5ddbf5fc3d59d2316d3914b271"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/FreeDSx/Socket/zipball/3a4949f39d87fe70a0fc838d47aaf0bf8c900c3e",
-                "reference": "3a4949f39d87fe70a0fc838d47aaf0bf8c900c3e",
+                "url": "https://api.github.com/repos/FreeDSx/Socket/zipball/d0c8c6f684582e5ddbf5fc3d59d2316d3914b271",
+                "reference": "d0c8c6f684582e5ddbf5fc3d59d2316d3914b271",
                 "shasum": ""
             },
             "require": {
                 "php": ">=7.1"
             },
             "require-dev": {
-                "freedsx/asn1": "^0.4.0",
-                "friends-of-phpspec/phpspec-code-coverage": "^4.3|^6.1",
-                "phpspec/phpspec": "^5.1|^6.1|^7.1",
-                "phpstan/phpstan": "^0.12"
+                "freedsx/asn1": ">=0.4, <1.0",
+                "friends-of-phpspec/phpspec-code-coverage": "^6.1|^7.0",
+                "phpspec/phpspec": "^7.1|^8.0",
+                "phpstan/phpstan": "^2.0"
             },
             "suggest": {
                 "ext-openssl": "For SSL/TLS support.",
@@ -235,36 +236,36 @@
             ],
             "support": {
                 "issues": "https://github.com/FreeDSx/Socket/issues",
-                "source": "https://github.com/FreeDSx/Socket/tree/0.5.2"
+                "source": "https://github.com/FreeDSx/Socket/tree/0.6.3"
             },
-            "time": "2021-12-31T22:39:06+00:00"
+            "time": "2026-04-25T17:18:43+00:00"
         },
         {
             "name": "psr/log",
-            "version": "1.1.4",
+            "version": "3.0.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/php-fig/log.git",
-                "reference": "d49695b909c3b7628b6289db5479a1c204601f11"
+                "reference": "f16e1d5863e37f8d8c2a01719f5b34baa2b714d3"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/php-fig/log/zipball/d49695b909c3b7628b6289db5479a1c204601f11",
-                "reference": "d49695b909c3b7628b6289db5479a1c204601f11",
+                "url": "https://api.github.com/repos/php-fig/log/zipball/f16e1d5863e37f8d8c2a01719f5b34baa2b714d3",
+                "reference": "f16e1d5863e37f8d8c2a01719f5b34baa2b714d3",
                 "shasum": ""
             },
             "require": {
-                "php": ">=5.3.0"
+                "php": ">=8.0.0"
             },
             "type": "library",
             "extra": {
                 "branch-alias": {
-                    "dev-master": "1.1.x-dev"
+                    "dev-master": "3.x-dev"
                 }
             },
             "autoload": {
                 "psr-4": {
-                    "Psr\\Log\\": "Psr/Log/"
+                    "Psr\\Log\\": "src"
                 }
             },
             "notification-url": "https://packagist.org/downloads/",
@@ -285,21 +286,21 @@
                 "psr-3"
             ],
             "support": {
-                "source": "https://github.com/php-fig/log/tree/1.1.4"
+                "source": "https://github.com/php-fig/log/tree/3.0.2"
             },
-            "time": "2021-05-03T11:20:27+00:00"
+            "time": "2024-09-11T13:17:53+00:00"
         }
     ],
     "packages-dev": [],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": [],
+    "stability-flags": {},
     "prefer-stable": false,
     "prefer-lowest": false,
-    "platform": [],
-    "platform-dev": [],
+    "platform": {},
+    "platform-dev": {},
     "platform-overrides": {
-        "php": "7.4"
+        "php": "8.2"
     },
-    "plugin-api-version": "2.3.0"
+    "plugin-api-version": "2.6.0"
 }

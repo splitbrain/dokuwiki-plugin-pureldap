@@ -8,6 +8,7 @@ use DokuWikiTest;
  * General tests for the pureldap plugin
  *
  * @group plugin_pureldap
+ * @group plugin_pureldap_unit
  * @group plugins
  */
 class GeneralTest extends DokuWikiTest
@@ -32,9 +33,9 @@ class GeneralTest extends DokuWikiTest
         $this->assertArrayHasKey('url', $info);
 
         $this->assertEquals('pureldap', $info['base']);
-        $this->assertRegExp('/^https?:\/\//', $info['url']);
+        $this->assertMatchesRegularExpression('/^https?:\/\//', $info['url']);
         $this->assertTrue(mail_isvalid($info['email']));
-        $this->assertRegExp('/^\d\d\d\d-\d\d-\d\d$/', $info['date']);
+        $this->assertMatchesRegularExpression('/^\d\d\d\d-\d\d-\d\d$/', $info['date']);
         $this->assertTrue(false !== strtotime($info['date']));
     }
 

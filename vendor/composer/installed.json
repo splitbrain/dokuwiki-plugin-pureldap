@@ -2,17 +2,17 @@
     "packages": [
         {
             "name": "freedsx/asn1",
-            "version": "0.4.7",
-            "version_normalized": "0.4.7.0",
+            "version": "0.4.8",
+            "version_normalized": "0.4.8.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/FreeDSx/ASN1.git",
-                "reference": "aea7159cb82f6567143db4ba6fd119e8f791c3fb"
+                "reference": "a136e7981d2ca76b140570834bd65debf42ee3da"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/FreeDSx/ASN1/zipball/aea7159cb82f6567143db4ba6fd119e8f791c3fb",
-                "reference": "aea7159cb82f6567143db4ba6fd119e8f791c3fb",
+                "url": "https://api.github.com/repos/FreeDSx/ASN1/zipball/a136e7981d2ca76b140570834bd65debf42ee3da",
+                "reference": "a136e7981d2ca76b140570834bd65debf42ee3da",
                 "shasum": ""
             },
             "require": {
@@ -29,7 +29,7 @@
             "suggest": {
                 "ext-gmp": "For big integer support in Integer/Enumerated/OID types and tag numbers."
             },
-            "time": "2023-06-06T16:47:22+00:00",
+            "time": "2024-10-13T15:35:35+00:00",
             "type": "library",
             "installation-source": "dist",
             "autoload": {
@@ -58,31 +58,31 @@
             ],
             "support": {
                 "issues": "https://github.com/FreeDSx/ASN1/issues",
-                "source": "https://github.com/FreeDSx/ASN1/tree/0.4.7"
+                "source": "https://github.com/FreeDSx/ASN1/tree/0.4.8"
             },
             "install-path": "../freedsx/asn1"
         },
         {
             "name": "freedsx/ldap",
-            "version": "0.8.0",
-            "version_normalized": "0.8.0.0",
+            "version": "0.8.1",
+            "version_normalized": "0.8.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/FreeDSx/LDAP.git",
-                "reference": "98cf7abe6762cd8062bde6f0bbd9bd8364e7d52a"
+                "reference": "b94be237daaa6f7144f9ff9a7fd158229597b784"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/FreeDSx/LDAP/zipball/98cf7abe6762cd8062bde6f0bbd9bd8364e7d52a",
-                "reference": "98cf7abe6762cd8062bde6f0bbd9bd8364e7d52a",
+                "url": "https://api.github.com/repos/FreeDSx/LDAP/zipball/b94be237daaa6f7144f9ff9a7fd158229597b784",
+                "reference": "b94be237daaa6f7144f9ff9a7fd158229597b784",
                 "shasum": ""
             },
             "require": {
-                "freedsx/asn1": "^0.4.0",
-                "freedsx/sasl": "^0.1.0",
-                "freedsx/socket": "^0.5.2",
+                "freedsx/asn1": ">=0.4,<1.0",
+                "freedsx/sasl": ">=0.1,<1.0",
+                "freedsx/socket": ">=0.5,<1.0",
                 "php": ">=7.1",
-                "psr/log": "^1|^2|^3"
+                "psr/log": "^1||^2||^3"
             },
             "require-dev": {
                 "friends-of-phpspec/phpspec-code-coverage": "^4.3|^6.1|dev-master",
@@ -98,7 +98,7 @@
                 "ext-openssl": "For SSL/TLS support and some SASL mechanisms.",
                 "ext-pcntl": "For LDAP server functionality."
             },
-            "time": "2022-05-21T19:17:54+00:00",
+            "time": "2026-04-25T16:51:40+00:00",
             "type": "library",
             "installation-source": "dist",
             "autoload": {
@@ -125,37 +125,38 @@
             ],
             "support": {
                 "issues": "https://github.com/FreeDSx/LDAP/issues",
-                "source": "https://github.com/FreeDSx/LDAP/tree/0.8.0"
+                "source": "https://github.com/FreeDSx/LDAP/tree/0.8.1"
             },
             "install-path": "../freedsx/ldap"
         },
         {
             "name": "freedsx/sasl",
-            "version": "0.1.1",
-            "version_normalized": "0.1.1.0",
+            "version": "0.2.1",
+            "version_normalized": "0.2.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/FreeDSx/SASL.git",
-                "reference": "baffafed1a46bd6c28257bf5f8893df0663b158b"
+                "reference": "8dfa6e105f101960d9fa5f9c57d9c461d2c20593"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/FreeDSx/SASL/zipball/baffafed1a46bd6c28257bf5f8893df0663b158b",
-                "reference": "baffafed1a46bd6c28257bf5f8893df0663b158b",
+                "url": "https://api.github.com/repos/FreeDSx/SASL/zipball/8dfa6e105f101960d9fa5f9c57d9c461d2c20593",
+                "reference": "8dfa6e105f101960d9fa5f9c57d9c461d2c20593",
                 "shasum": ""
             },
             "require": {
                 "php": ">=7.1"
             },
             "require-dev": {
-                "phpstan/phpstan": "^0.11.12",
-                "phpunit/phpunit": "^7.0",
-                "symplify/easy-coding-standard": "^6.1"
+                "phpstan/phpstan": "^0.11|^0.12",
+                "phpunit/phpunit": "^7.0|^8.5|^9.5",
+                "symfony/polyfill-php80": "^1.27",
+                "symplify/easy-coding-standard": ">=6.1"
             },
             "suggest": {
                 "ext-openssl": "Needed for encryption for certain mechanisms."
             },
-            "time": "2019-12-10T01:45:19+00:00",
+            "time": "2026-03-22T23:50:16+00:00",
             "type": "library",
             "installation-source": "dist",
             "autoload": {
@@ -180,37 +181,41 @@
                 "DIGEST-MD5",
                 "sasl"
             ],
+            "support": {
+                "issues": "https://github.com/FreeDSx/SASL/issues",
+                "source": "https://github.com/FreeDSx/SASL/tree/0.2.1"
+            },
             "install-path": "../freedsx/sasl"
         },
         {
             "name": "freedsx/socket",
-            "version": "0.5.2",
-            "version_normalized": "0.5.2.0",
+            "version": "0.6.3",
+            "version_normalized": "0.6.3.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/FreeDSx/Socket.git",
-                "reference": "3a4949f39d87fe70a0fc838d47aaf0bf8c900c3e"
+                "reference": "d0c8c6f684582e5ddbf5fc3d59d2316d3914b271"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/FreeDSx/Socket/zipball/3a4949f39d87fe70a0fc838d47aaf0bf8c900c3e",
-                "reference": "3a4949f39d87fe70a0fc838d47aaf0bf8c900c3e",
+                "url": "https://api.github.com/repos/FreeDSx/Socket/zipball/d0c8c6f684582e5ddbf5fc3d59d2316d3914b271",
+                "reference": "d0c8c6f684582e5ddbf5fc3d59d2316d3914b271",
                 "shasum": ""
             },
             "require": {
                 "php": ">=7.1"
             },
             "require-dev": {
-                "freedsx/asn1": "^0.4.0",
-                "friends-of-phpspec/phpspec-code-coverage": "^4.3|^6.1",
-                "phpspec/phpspec": "^5.1|^6.1|^7.1",
-                "phpstan/phpstan": "^0.12"
+                "freedsx/asn1": ">=0.4, <1.0",
+                "friends-of-phpspec/phpspec-code-coverage": "^6.1|^7.0",
+                "phpspec/phpspec": "^7.1|^8.0",
+                "phpstan/phpstan": "^2.0"
             },
             "suggest": {
                 "ext-openssl": "For SSL/TLS support.",
                 "freedsx/asn1": "For ASN.1 based message queues."
             },
-            "time": "2021-12-31T22:39:06+00:00",
+            "time": "2026-04-25T17:18:43+00:00",
             "type": "library",
             "installation-source": "dist",
             "autoload": {
@@ -237,39 +242,39 @@
             ],
             "support": {
                 "issues": "https://github.com/FreeDSx/Socket/issues",
-                "source": "https://github.com/FreeDSx/Socket/tree/0.5.2"
+                "source": "https://github.com/FreeDSx/Socket/tree/0.6.3"
             },
             "install-path": "../freedsx/socket"
         },
         {
             "name": "psr/log",
-            "version": "1.1.4",
-            "version_normalized": "1.1.4.0",
+            "version": "3.0.2",
+            "version_normalized": "3.0.2.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/php-fig/log.git",
-                "reference": "d49695b909c3b7628b6289db5479a1c204601f11"
+                "reference": "f16e1d5863e37f8d8c2a01719f5b34baa2b714d3"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/php-fig/log/zipball/d49695b909c3b7628b6289db5479a1c204601f11",
-                "reference": "d49695b909c3b7628b6289db5479a1c204601f11",
+                "url": "https://api.github.com/repos/php-fig/log/zipball/f16e1d5863e37f8d8c2a01719f5b34baa2b714d3",
+                "reference": "f16e1d5863e37f8d8c2a01719f5b34baa2b714d3",
                 "shasum": ""
             },
             "require": {
-                "php": ">=5.3.0"
+                "php": ">=8.0.0"
             },
-            "time": "2021-05-03T11:20:27+00:00",
+            "time": "2024-09-11T13:17:53+00:00",
             "type": "library",
             "extra": {
                 "branch-alias": {
-                    "dev-master": "1.1.x-dev"
+                    "dev-master": "3.x-dev"
                 }
             },
             "installation-source": "dist",
             "autoload": {
                 "psr-4": {
-                    "Psr\\Log\\": "Psr/Log/"
+                    "Psr\\Log\\": "src"
                 }
             },
             "notification-url": "https://packagist.org/downloads/",
@@ -290,7 +295,7 @@
                 "psr-3"
             ],
             "support": {
-                "source": "https://github.com/php-fig/log/tree/1.1.4"
+                "source": "https://github.com/php-fig/log/tree/3.0.2"
             },
             "install-path": "../psr/log"
         }

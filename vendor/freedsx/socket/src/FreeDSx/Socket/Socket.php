@@ -54,12 +54,13 @@ class Socket
     protected $errorNumber;
 
     /**
-     * @var array
+     * @var array<string, string>
      */
     protected $sslOptsMap = [
         'ssl_allow_self_signed' => 'allow_self_signed',
         'ssl_ca_cert' => 'cafile',
-        'ssl_crypto_type' => 'crypto_type',
+        'ssl_crypto_method' => 'crypto_method',
+        'ssl_ciphers' => 'ciphers',
         'ssl_peer_name' => 'peer_name',
         'ssl_cert' => 'local_cert',
         'ssl_cert_key' => 'local_pk',
@@ -67,7 +68,7 @@ class Socket
     ];
 
     /**
-     * @var array
+     * @var array<string, bool>
      */
     protected $sslOpts = [
         'allow_self_signed' => false,
@@ -78,13 +79,14 @@ class Socket
     ];
 
     /**
-     * @var array
+     * @var array<string, mixed>
      */
     protected $options = [
         'transport' => 'tcp',
         'port' => 389,
         'use_ssl' => false,
-        'ssl_crypto_type' => STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT | STREAM_CRYPTO_METHOD_TLSv1_1_CLIENT | STREAM_CRYPTO_METHOD_TLS_CLIENT,
+        'ssl_crypto_method' => STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT | STREAM_CRYPTO_METHOD_TLSv1_1_CLIENT | STREAM_CRYPTO_METHOD_TLS_CLIENT,
+        'ssl_ciphers' => 'DEFAULT',
         'ssl_validate_cert' => true,
         'ssl_allow_self_signed' => null,
         'ssl_ca_cert' => null,
@@ -96,7 +98,7 @@ class Socket
 
     /**
      * @param resource|null $resource
-     * @param array $options
+     * @param array<string, mixed> $options
      */
     public function __construct($resource = null, array $options = [])
     {
@@ -162,7 +164,18 @@ class Socket
      */
     public function isConnected() : bool
     {
-        return $this->socket !== null && !@\feof($this->socket);
+        if ($this->socket === null) {
+            return false;
+        }
+
+        // Slight optimization. The feof() method should be more accurate and unix socket should be less likely.
+        // In PHP 8.2 feof is not accurate for checking a UNIX socket.
+        if ($this->options['transport'] !== 'unix') {
+            return !@\feof($this->socket);
+        }
+
+        // The is_resource() function will also check if a resource is connected or not.
+        return \is_resource($this->socket);
     }
 
     /**
@@ -198,7 +211,7 @@ class Socket
     public function encrypt(bool $encrypt)
     {
         \stream_set_blocking($this->socket, true);
-        $result = \stream_socket_enable_crypto($this->socket, $encrypt, $this->options['ssl_crypto_type']);
+        $result = \stream_socket_enable_crypto($this->socket, $encrypt, $this->options['ssl_crypto_method']);
         \stream_set_blocking($this->socket, false);
 
         if ((bool) $result == false) {
@@ -256,7 +269,7 @@ class Socket
     /**
      * Get the options set for the socket.
      *
-     * @return array
+     * @return array<string, mixed>
      */
     public function getOptions() : array
     {
@@ -267,7 +280,7 @@ class Socket
      * Create a socket by connecting to a specific host.
      *
      * @param string $host
-     * @param array $options
+     * @param array<string, mixed> $options
      * @return Socket
      * @throws ConnectionException
      */
@@ -280,7 +293,7 @@ class Socket
      * Create a UNIX based socket.
      *
      * @param string $file The full path to the unix socket.
-     * @param array $options Any additional options.
+     * @param array<string, mixed> $options Any additional options.
      * @return Socket
      * @throws ConnectionException
      */
@@ -301,7 +314,7 @@ class Socket
      * Create a TCP based socket.
      *
      * @param string $host
-     * @param array $options
+     * @param array<string, mixed> $options
      * @return Socket
      * @throws ConnectionException
      */
@@ -314,7 +327,7 @@ class Socket
      * Create a UDP based socket.
      *
      * @param string $host
-     * @param array $options
+     * @param array<string, mixed> $options
      * @return Socket
      * @throws ConnectionException
      */

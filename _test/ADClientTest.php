@@ -8,16 +8,22 @@ use dokuwiki\plugin\pureldap\classes\ADClient;
  * General tests for the pureldap plugin
  *
  * @group plugin_pureldap
+ * @group plugin_pureldap_ad
  * @group plugins
  */
-class ADClientTest extends \DokuWikiTest
+class ADClientTest extends LDAPTestCase
 {
+    protected const HOST_ENV = 'AD_TEST_HOST';
+    protected const PORT_ENV = 'AD_TEST_PORT';
+    protected const DEFAULT_PORT = 7389;
+
     /**
      * Create a client with default settings
      *
      * Optionally allows to override configs.
      *
-     * All tests assume to be running against https://github.com/splitbrain/vagrant-active-directory
+     * All tests assume to be running against the compose fixture in
+     * _test/docker-compose.yml.
      *
      * @param array $conf
      * @return ADClient
@@ -27,10 +33,10 @@ class ADClientTest extends \DokuWikiTest
         return new ADClient(
             array_merge(
                 [
-                    'base_dn' => 'DC=example,DC=local',
+                    'base_dn' => 'dc=example,dc=local',
                     'suffix' => 'example.local',
-                    'servers' => ['localhost'],
-                    'port' => 7389, // SSL: 7636
+                    'servers' => [$this->ldapHost],
+                    'port' => $this->ldapPort, // SSL: 7636
                     'admin_username' => 'vagrant',
                     'admin_password' => 'vagrant',
                     'encryption' => 'tls',
@@ -63,21 +69,21 @@ class ADClientTest extends \DokuWikiTest
         ];
 
         $client = $this->getClient();
-        $user = $client->getUser('a.legrand@example.local');
+        $user = $client->getUser('a.legrand@example.com');
 
         $this->assertGreaterThan(mktime(0,0,0,6,1,2023), $user['lastpwd'], 'lastpwd should be a timestamp');
         unset($user['lastpwd']); // we don't know the exact value, so we remove it for the comparison
-        $this->assertSame($expect, $user);
+        $this->assertEquals($expect, $user);
 
         // access should work without the domain, too
         $user = $client->getUser('a.legrand');
         unset($user['lastpwd']);
-        $this->assertSame($expect, $user);
+        $this->assertEquals($expect, $user);
 
         // access should be case Insensitive
         $user = $client->getUser('A.LeGrand');
         unset($user['lastpwd']);
-        $this->assertSame($expect, $user);
+        $this->assertEquals($expect, $user);
     }
 
     public function testGetLongUser()
@@ -107,7 +113,7 @@ class ADClientTest extends \DokuWikiTest
         ];
 
         $client = $this->getClient(['recursivegroups' => 1]);
-        $user = $client->getUser('m.albro@example.local');
+        $user = $client->getUser('m.albro@example.com');
         $this->assertSame($expect, $user['grps']);
     }
 

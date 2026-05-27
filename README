@@ -1,6 +1,8 @@
 pureldap Plugin for DokuWiki
 
-A new LDAP auth plugin
+Universal LDAP authentication for DokuWiki. Replaces the bundled authad
+and authldap plugins with a single backend built on the FreeDSx pure-PHP
+LDAP library.
 
 All documentation for this plugin can be found at
 https://www.dokuwiki.org/plugin:pureldap
@@ -11,6 +13,98 @@ will not work!
 
 Please refer to http://www.dokuwiki.org/plugins for additional info
 on how to install plugins in DokuWiki.
+
+----
+Picking a directory type
+
+pureldap supports two modes, selected with the `directory_type` config
+option (default `ad` for backwards compatibility):
+
+  * `ad`   - Active Directory. Pre-seeds AD's schema as defaults
+             (sAMAccountName + userPrincipalName, displayName,
+             objectClass=user/group, memberOf, primaryGroupID, ...).
+             Decodes pwdlastset / userAccountControl for password
+             expiry, knows the AD bind error sub-codes, applies the UPN
+             suffix during bind, and handles the unicodePwd UTF-16LE
+             password change protocol.
+
+  * `ldap` - Any RFC 4511 LDAP server: OpenLDAP, FreeIPA, 389DS, etc.
+             All schema details are configurable; sensible posix
+             defaults are pre-seeded.
+
+----
+Migrating from authad
+
+  authad option       -> pureldap option
+  -------------       -------------------
+  account_suffix      -> suffix
+  base_dn             -> base_dn
+  domain_controllers  -> servers (comma-list)
+  use_ssl             -> encryption = ssl
+  use_tls             -> encryption = tls
+  admin_username      -> admin_username
+  admin_password      -> admin_password
+  real_primarygroup   -> (implicit; primaryGroupID=513 is always honoured)
+  additional          -> attributes
+  expirywarn          -> expirywarn
+  recursive_groups    -> recursivegroups
+  update_pass         -> implicit via encryption setting
+  sso                 -> sso
+  sso_charset         -> sso_charset
+
+  Set directory_type = ad (the default).
+
+Known regressions for authad users:
+  * Multi-domain dispatch (per-domain config sub-arrays + UI domain
+    selector) is not yet implemented. Single-domain forests work fine.
+  * update_name / update_mail are not implemented (pureldap supports
+    password changes only, same as authldap).
+
+----
+Migrating from authldap
+
+  authldap option  -> pureldap option
+  ---------------  -------------------
+  server           -> servers (comma-list)
+  port             -> port
+  usertree         -> usertree
+  grouptree        -> grouptree
+  userfilter       -> userfilter
+  groupfilter      -> groupfilter
+  userscope        -> userscope
+  groupscope       -> groupscope
+  userkey          -> userkey
+  groupkey         -> groupkey
+  starttls         -> encryption = tls
+  binddn + bindpw  -> binddn (template) or admin_username + admin_password
+  attributes       -> attributes
+  modPass          -> modPass
+  modPassPlain     -> modPassPlain
+
+  Set directory_type = ldap.
+
+Bind mode selection:
+  * binddn template with %{user}: direct user bind (no admin lookup).
+  * admin_username + admin_password set: service-account bind, then
+    search-then-bind as the user. This is the closest equivalent to
+    authldap's "anonymous or service-account search + user bind" flow.
+
+Group resolution (group_strategy):
+  * `auto` (default): grouptree if groupfilter is set, else memberOf if
+    the user entry carries it, else just defaultgroup.
+  * `grouptree`: RFC 2307 / posixGroup pattern with groupfilter.
+  * `memberof`: walk the memberOf attribute (requires the memberOf
+    overlay on OpenLDAP / FreeIPA / 389DS). With recursivegroups=1 the
+    nested-group hierarchy is followed via GroupHierarchyCache.
+  * `none`: just defaultgroup.
+
+Known regressions for authldap users:
+  * The `version`, `referrals`, and `deref` options are not exposed.
+    FreeDSx speaks LDAPv3 only; referral and dereferencing behaviour
+    follow FreeDSx defaults.
+  * The advanced `mapping` array (attribute + regex extraction) is not
+    yet ported. `namekey` and `userkey` accept comma-separated fallback
+    lists which covers the most common case.
 
 ----
 Copyright (C) Andreas Gohr <andi@splitbrain.org>

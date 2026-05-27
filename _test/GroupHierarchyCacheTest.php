@@ -4,23 +4,27 @@ namespace dokuwiki\plugin\pureldap\test;
 
 use dokuwiki\plugin\pureldap\classes\ADClient;
 use dokuwiki\plugin\pureldap\classes\GroupHierarchyCache;
-use DokuWikiTest;
 
 /**
  * tests for the pureldap plugin
  *
  * @group plugin_pureldap
+ * @group plugin_pureldap_ad
  * @group plugins
  */
-class GroupHierarchyCacheTest extends DokuWikiTest
+class GroupHierarchyCacheTest extends LDAPTestCase
 {
+    protected const HOST_ENV = 'AD_TEST_HOST';
+    protected const PORT_ENV = 'AD_TEST_PORT_SSL';
+    protected const DEFAULT_PORT = 7636;
 
     /**
      * Return an initialized GroupHierarchyCache
      *
      * Creates a client with default settings. Optionally allows to override configs.
      *
-     * All tests assume to be running against https://github.com/splitbrain/vagrant-active-directory
+     * All tests assume to be running against the compose fixture in
+     * _test/docker-compose.yml.
      *
      * @param array $conf
      * @return GroupHierarchyCache|null
@@ -30,10 +34,10 @@ class GroupHierarchyCacheTest extends DokuWikiTest
         $client = new ADClient(
             array_merge(
                 [
-                    'base_dn' => 'DC=example,DC=local',
+                    'base_dn' => 'dc=example,dc=local',
                     'suffix' => 'example.local',
-                    'servers' => ['localhost'],
-                    'port' => 7636,
+                    'servers' => [$this->ldapHost],
+                    'port' => $this->ldapPort,
                     'admin_username' => 'vagrant',
                     'admin_password' => 'vagrant',
                     'encryption' => 'ssl',
