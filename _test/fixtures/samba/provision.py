@@ -19,7 +19,14 @@ USERS_CSV = FIXTURES / "users.csv"
 GROUPS_CSV = FIXTURES / "groups.csv"
 
 USER_PASSWORD = "Foo_b_ar123!"
-USERS_DN  = "CN=Users,DC=example,DC=com"
+# Domain layout mirrors splitbrain/vagrant-active-directory: DN suffix
+# example.local, userPrincipalName uses @example.local, but the mail
+# attribute is hardcoded to @example.com (matches importusers.ps1).
+USERS_DN  = "CN=Users,DC=example,DC=local"
+UPN_DOMAIN = "example.local"
+MAIL_DOMAIN = "example.com"
+ADMIN_USER = "vagrant"
+ADMIN_PASS = "vagrant"
 SAM_LDB   = "/var/lib/samba/private/sam.ldb"
 SENTINEL  = Path("/tmp/provisioned")
 
@@ -71,7 +78,7 @@ def add_user(uid, row):
         "samba-tool", "user", "create", uid, USER_PASSWORD,
         f"--given-name={row['first']}",
         f"--surname={row['last']}",
-        f"--mail-address={uid}@example.com",
+        f"--mail-address={uid}@{MAIL_DOMAIN}",
     ]
     for col, flag in [
         ("phone",       "--telephone-number"),
@@ -88,7 +95,7 @@ def add_user(uid, row):
     attrs = {"displayName": cn}
     # 512 NORMAL_ACCOUNT | 65536 DONT_EXPIRE_PASSWD = 66048
     attrs["userAccountControl"] = "66048"
-    attrs["userPrincipalName"] = f"{uid}@example.com"
+    attrs["userPrincipalName"] = f"{uid}@{UPN_DOMAIN}"
     if row.get("mobile"):      attrs["mobile"]      = row["mobile"]
     if row.get("title"):       attrs["personalTitle"] = row["title"]
     if row.get("homepage"):    attrs["wWWHomePage"] = row["homepage"]
@@ -158,13 +165,39 @@ def main():
         run([
             "samba-tool", "user", "create", "longlong", USER_PASSWORD,
             "--given-name=Very", "--surname=Long",
-            "--mail-address=longlong@example.com",
+            f"--mail-address=longlong@{MAIL_DOMAIN}",
         ])
         ldb_modify(f"CN=Very Long,{USERS_DN}", {
             "displayName":        "Very Long",
             "userAccountControl": "66048",
-            "userPrincipalName":  "averylongusernamethatisverylong@example.com",
+            "userPrincipalName":  f"averylongusernamethatisverylong@{UPN_DOMAIN}",
         })
+
+    # Bind/admin user mirroring splitbrain/vagrant-active-directory's
+    # `vagrant`/`vagrant` Domain Admin. setup.sh has already disabled
+    # password complexity so the trivial password is accepted.
+    # samba-tool builds the CN from given-name + surname, not the
+    # sAMAccountName — the user object's DN is CN=Vagrant Admin, even
+    # though the login is `vagrant`.
+    admin_cn = "Vagrant Admin"
+    if user_exists(ADMIN_USER):
+        print(f"  = user {ADMIN_USER} already exists, skipping create")
+    else:
+        print(f"  + user {ADMIN_USER}")
+        run([
+            "samba-tool", "user", "create", ADMIN_USER, ADMIN_PASS,
+            "--given-name=Vagrant", "--surname=Admin",
+            f"--mail-address={ADMIN_USER}@{MAIL_DOMAIN}",
+        ])
+        ldb_modify(f"CN={admin_cn},{USERS_DN}", {
+            "displayName":        admin_cn,
+            "userAccountControl": "66048",
+            "userPrincipalName":  f"{ADMIN_USER}@{UPN_DOMAIN}",
+        })
+    # Outside the create branch so a partial first run that died between
+    # `user create` and the group add still gets a Domain Admin on retry.
+    run(["samba-tool", "group", "addmembers", "Domain Admins",
+         ADMIN_USER], allow_exists=True)
 
     SENTINEL.touch()
     print("[samba/provision] done")

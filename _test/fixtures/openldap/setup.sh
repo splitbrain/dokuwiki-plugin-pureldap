@@ -23,19 +23,8 @@ BASE="dc=example,dc=com"
 PEOPLE_OU="ou=People,${BASE}"
 GROUPS_OU="ou=Groups,${BASE}"
 
-# Wait for slapd to bind. osixia's bootstrap finishes before post_start
-# in practice, but be defensive.
-echo "[openldap/setup] waiting for slapd..."
-for i in $(seq 1 60); do
-    if ldapwhoami -x -H ldap://localhost >/dev/null 2>&1 || \
-       [ ! -x /usr/bin/ldapwhoami ]; then
-        # If ldapwhoami doesn't exist yet, fall through to the install step;
-        # we'll re-check below.
-        break
-    fi
-    sleep 1
-done
-
+# Install ldap-utils if missing. osixia/openldap doesn't always ship
+# the client tools, and provision.py shells out to ldapadd / ldapmodify.
 if ! command -v ldapadd >/dev/null 2>&1; then
     echo "[openldap/setup] installing ldap-utils..."
     export DEBIAN_FRONTEND=noninteractive
@@ -43,13 +32,32 @@ if ! command -v ldapadd >/dev/null 2>&1; then
     apt-get install -y --no-install-recommends -qq ldap-utils
 fi
 
-# Re-wait now that ldapwhoami is available.
-for i in $(seq 1 60); do
-    if ldapwhoami -x -H ldap://localhost >/dev/null 2>&1; then
-        break
+# Wait for slapd to settle. osixia/openldap brings slapd up to apply
+# bootstrap LDIFs, then stops and restarts it under its process
+# supervisor before the container is fully steady. ldapwhoami can
+# briefly succeed against the bootstrap slapd and then fail seconds
+# later with "Can't contact LDAP server" while the restart happens.
+# We require slapd's PID to be unchanged AND ldapwhoami to keep
+# succeeding for several consecutive seconds before proceeding.
+echo "[openldap/setup] waiting for slapd to settle..."
+prev_pid=""
+stable=0
+for i in $(seq 1 120); do
+    cur_pid=$(pgrep -d, slapd 2>/dev/null || true)
+    if [ -n "$cur_pid" ] && [ "$cur_pid" = "$prev_pid" ] \
+            && ldapwhoami -x -H ldap://localhost >/dev/null 2>&1; then
+        stable=$((stable + 1))
+        if [ "$stable" -ge 5 ]; then break; fi
+    else
+        stable=0
     fi
+    prev_pid="$cur_pid"
     sleep 1
 done
+if [ "$stable" -lt 5 ]; then
+    echo "[openldap/setup] slapd never stabilised within 120s" >&2
+    exit 1
+fi
 
 ensure_ou() {
     local dn="$1" rdn_val="$2"

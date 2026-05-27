@@ -19,12 +19,12 @@ class AuthTest extends LDAPTestCase {
 
         global $conf;
         $conf['auth'] = 'pureldap';
-        $conf['plugin']['pureldap']['base_dn'] = 'dc=example,dc=com';
-        $conf['plugin']['pureldap']['suffix'] = 'example.com';
+        $conf['plugin']['pureldap']['base_dn'] = 'dc=example,dc=local';
+        $conf['plugin']['pureldap']['suffix'] = 'example.local';
         $conf['plugin']['pureldap']['servers'] = [$this->ldapHost];
         $conf['plugin']['pureldap']['port'] = $this->ldapPort;
-        $conf['plugin']['pureldap']['admin_username'] = 'Administrator';
-        $conf['plugin']['pureldap']['admin_password'] = 'Foo_b_ar123!';
+        $conf['plugin']['pureldap']['admin_username'] = 'vagrant';
+        $conf['plugin']['pureldap']['admin_password'] = 'vagrant';
         $conf['plugin']['pureldap']['encryption'] = 'ssl';
         $conf['plugin']['pureldap']['validate'] = 'self';
     }

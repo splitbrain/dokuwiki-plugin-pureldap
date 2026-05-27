@@ -33,12 +33,12 @@ class ADClientTest extends LDAPTestCase
         return new ADClient(
             array_merge(
                 [
-                    'base_dn' => 'dc=example,dc=com',
-                    'suffix' => 'example.com',
+                    'base_dn' => 'dc=example,dc=local',
+                    'suffix' => 'example.local',
                     'servers' => [$this->ldapHost],
                     'port' => $this->ldapPort, // SSL: 7636
-                    'admin_username' => 'Administrator',
-                    'admin_password' => 'Foo_b_ar123!',
+                    'admin_username' => 'vagrant',
+                    'admin_password' => 'vagrant',
                     'encryption' => 'tls',
                     'validate' => 'self',
                     'attributes' => ['mobile'],
@@ -57,7 +57,7 @@ class ADClientTest extends LDAPTestCase
             'user' => 'a.legrand',
             'name' => 'Amerigo Legrand',
             'mail' => 'a.legrand@example.com',
-            'dn' => 'CN=Amerigo Legrand,CN=Users,DC=example,DC=com',
+            'dn' => 'CN=Amerigo Legrand,CN=Users,DC=example,DC=local',
             'grps' => [
                 'beta',
                 'domain users',

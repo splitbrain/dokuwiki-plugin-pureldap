@@ -33,7 +33,7 @@ services:
         openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
           -keyout /certs/key.pem -out /certs/cert.pem \
           -subj '/CN=localhost' \
-          -addext 'subjectAltName=DNS:localhost,DNS:dc1.example.com,IP:127.0.0.1'
+          -addext 'subjectAltName=DNS:localhost,DNS:dc1.example.local,IP:127.0.0.1'
         cp /certs/cert.pem /certs/ca.pem
         chmod 644 /certs/*.pem
 
@@ -73,17 +73,18 @@ services:
     image: nowsci/samba-domain:latest
     container_name: pureldap-samba
     hostname: dc1
-    # AD-DC needs to control its own hostname resolution
-    domainname: example.com
+    # AD-DC needs to control its own hostname resolution.
+    # Domain mirrors splitbrain/vagrant-active-directory (example.local).
+    domainname: example.local
     privileged: true
     depends_on:
       tls-init:
         condition: service_completed_successfully
     environment:
-      DOMAIN:         "EXAMPLE.COM"
+      DOMAIN:         "EXAMPLE.LOCAL"
       DOMAINPASS:     "Foo_b_ar123!"
       DOMAIN_NETBIOS: "EXAMPLE"
-      DOMAIN_EMAIL:   "admin@example.com"
+      DOMAIN_EMAIL:   "admin@example.local"
       DNSFORWARDER:   "1.1.1.1"
       HOSTIP:         "127.0.0.1"
       INSECURELDAP:   "true"
